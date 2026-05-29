@@ -77,7 +77,7 @@ export default function PosterDetailPage({
         <div className="text-center">
           <p className="text-paper/60 mb-4">벽보를 찾을 수 없어요</p>
           <Link
-            href="/posters"
+            href="/"
             className="text-paper underline underline-offset-2 hover:text-paper/80 transition-colors"
           >
             벽보판으로 돌아가기
@@ -114,7 +114,7 @@ export default function PosterDetailPage({
         {/* Header */}
         <header className="mb-6">
           <Link
-            href="/posters"
+            href="/"
             className="text-paper/80 hover:text-paper text-sm transition-colors"
           >
             &larr; 벽보판으로
@@ -249,7 +249,7 @@ export default function PosterDetailPage({
         {/* Back button */}
         <div className="mt-8 text-center">
           <Link
-            href="/posters"
+            href="/"
             className="inline-block bg-paper/20 text-paper px-6 py-2 text-sm font-medium hover:bg-paper/30 transition-colors"
           >
             다른 벽보 보기

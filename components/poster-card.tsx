@@ -18,7 +18,8 @@ export function PosterCard({ post, rotation = 0 }: PosterCardProps) {
     { left: "40%", rotate: 3 },
     { left: "50%", rotate: -1 },
   ];
-  const tape = tapeVariants[Math.abs(rotation) % tapeVariants.length];
+  const tapeIndex = Math.abs(Math.round(rotation * 10)) % tapeVariants.length;
+  const tape = tapeVariants[tapeIndex];
 
   return (
     <Link href={`/posters/${post.id}`} className="block group">

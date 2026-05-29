@@ -66,7 +66,7 @@ export default function NewPosterPage() {
           border: "none",
         },
       });
-      router.push("/posters");
+      router.push("/");
     } catch {
       toast.error("연결 오류가 발생했습니다");
       setSubmitting(false);
@@ -90,7 +90,7 @@ export default function NewPosterPage() {
         {/* Header */}
         <header className="mb-6">
           <Link
-            href="/posters"
+            href="/"
             className="text-paper/80 hover:text-paper text-sm transition-colors"
           >
             &larr; 벽보판으로
