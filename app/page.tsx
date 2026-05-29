@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 
 export default function Page() {
@@ -86,9 +87,9 @@ export default function Page() {
                 </p>
                 
                 <div className="py-4 border-t border-b border-foreground/20">
-                  <p className="text-xl sm:text-2xl font-bold">
-                    이어드림 허브, 곧 열림.
-                  </p>
+                <p className="text-xl sm:text-2xl font-bold">
+                  이어드림 허브, 열렸습니다.
+                </p>
                 </div>
                 
                 <p className="text-base sm:text-lg font-medium">
@@ -111,20 +112,35 @@ export default function Page() {
               </p>
               
               {/* CTA Area */}
-              <div className="space-y-4">
-                <button
-                  onClick={copyUrl}
-                  className="w-full bg-foreground text-primary-foreground py-3 px-6 text-base font-bold hover:bg-foreground/90 transition-colors active:scale-[0.98]"
+              <div className="space-y-3">
+                <Link
+                  href="/posters"
+                  className="block w-full bg-foreground text-primary-foreground py-3 px-6 text-base font-bold text-center hover:bg-foreground/90 transition-colors active:scale-[0.98]"
                 >
-                  주소 복사하기
-                </button>
-                
-                <button
-                  onClick={() => setShowBookmarkHelp(!showBookmarkHelp)}
-                  className="w-full text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+                  벽보 보러가기
+                </Link>
+
+                <Link
+                  href="/posters/new"
+                  className="block w-full bg-accent text-accent-foreground py-3 px-6 text-base font-bold text-center hover:bg-accent/90 transition-colors active:scale-[0.98]"
                 >
-                  즐겨찾기 해두기
-                </button>
+                  벽보 붙이기
+                </Link>
+
+                <div className="pt-2 flex gap-3">
+                  <button
+                    onClick={copyUrl}
+                    className="flex-1 text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+                  >
+                    주소 복사
+                  </button>
+                  <button
+                    onClick={() => setShowBookmarkHelp(!showBookmarkHelp)}
+                    className="flex-1 text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+                  >
+                    즐겨찾기
+                  </button>
+                </div>
                 
                 {showBookmarkHelp && (
                   <p className="text-xs text-muted-foreground text-center pt-2 animate-in fade-in duration-200">
