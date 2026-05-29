@@ -9,7 +9,7 @@ interface PlaceholderCardProps {
 
 const placeholderContent = [
   {
-    title: "광고주 찼습니다",
+    title: "광고주 찾습니다",
     description:
       "여기는 아직 비어있습니다. 팀원 찾거나 써봐달라고 할 게 있으면 한 장 붙여두세요.",
   },
