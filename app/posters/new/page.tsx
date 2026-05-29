@@ -294,6 +294,14 @@ export default function NewPosterPage() {
                 </p>
               </div>
 
+              {/* Notice */}
+              <div className="border-l-4 border-red-600 bg-white/60 p-4 text-sm leading-relaxed text-muted-foreground">
+                <p className="font-bold text-foreground mb-2">붙이기 전 확인</p>
+                <p>개인정보는 최소한으로 적어주세요.</p>
+                <p>전화번호보다는 Discord / 오픈채팅 / 링크를 추천합니다.</p>
+                <p>삭제나 수정이 필요하면 운영자에게 알려주세요.</p>
+              </div>
+
               {/* Submit */}
               <button
                 type="submit"
