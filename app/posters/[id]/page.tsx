@@ -444,6 +444,22 @@ export default function PosterDetailPage({
                 </div>
               )}
 
+              {/* Attached image */}
+              {post.image_url && (
+                <div className="mb-6">
+                  <h2 className="text-lg font-bold text-foreground mb-3">
+                    첨부 이미지
+                  </h2>
+                  <div className="bg-foreground/5 p-2">
+                    <img
+                      src={post.image_url}
+                      alt="첨부 이미지"
+                      className="w-full max-h-96 object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* External link */}
               {post.external_link && !isClosed && (
                 <div className="mb-6">
@@ -525,7 +541,7 @@ export default function PosterDetailPage({
                   >
                     수정하기
                   </button>
-                  {post.status === "open" && (
+                  {post.status === "open" && post.category === "teamup" && (
                     <button
                       onClick={handleCloseClick}
                       className="px-4 py-2 text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"

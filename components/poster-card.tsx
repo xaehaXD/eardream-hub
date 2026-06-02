@@ -125,7 +125,14 @@ export function PosterCard({ post }: PosterCardProps) {
         {/* Footer */}
         <div className="relative z-10 flex items-center justify-between pt-2 border-t border-foreground/10">
           <span className="text-xs text-muted-foreground">{post.author}</span>
-          <span className="text-xs text-muted-foreground">{timeAgo}</span>
+          <div className="flex items-center gap-2">
+            {post.image_url && (
+              <span className="text-xs text-blue-600" title="이미지 첨부됨">
+                &#128247;
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground">{timeAgo}</span>
+          </div>
         </div>
 
         {/* Hover effect - slight lift */}

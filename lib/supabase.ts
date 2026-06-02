@@ -98,6 +98,8 @@ export interface Post {
   paper_color: string | null;
   attachment_type: AttachmentType | null;
   rotation_deg: number | null;
+  // Image attachment (nullable - optional)
+  image_url: string | null;
 }
 
 // Feedback type for "써봐줘" posts
@@ -292,6 +294,7 @@ export const mockPosts: Post[] = [
     paper_color: "#FAF9F6",
     attachment_type: "masking_tape",
     rotation_deg: 1.2,
+    image_url: null,
   },
   {
     id: "2",
@@ -314,6 +317,7 @@ export const mockPosts: Post[] = [
     paper_color: "#FFFACD",
     attachment_type: "thumbtack",
     rotation_deg: -0.8,
+    image_url: "https://placehold.co/600x400/FFFACD/333333?text=App+Screenshot", // Demo image
   },
   {
     id: "3",
@@ -336,6 +340,7 @@ export const mockPosts: Post[] = [
     paper_color: "#F5DEB3",
     attachment_type: "stapler",
     rotation_deg: 0.5,
+    image_url: null,
   },
   {
     id: "4",
@@ -358,5 +363,6 @@ export const mockPosts: Post[] = [
     paper_color: "#E6F3FF",
     attachment_type: "clear_tape",
     rotation_deg: -1.5,
+    image_url: null,
   },
 ];

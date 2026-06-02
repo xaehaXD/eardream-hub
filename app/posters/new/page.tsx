@@ -40,10 +40,47 @@ export default function NewPosterPage() {
   // Paper selection
   const [paperType, setPaperType] = useState<PaperType>("a4");
 
+  // Image attachment
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   // Generate random color when paper type changes
   const previewColor = useMemo(() => {
     return getRandomPaperColor(paperType);
   }, [paperType]);
+
+  // Handle image selection
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("jpg, jpeg, png, webp 파일만 업로드 가능합니다");
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("이미지 파일은 5MB 이하만 가능합니다");
+      return;
+    }
+
+    setImageFile(file);
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+  }
+
+  function removeImage() {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImageFile(null);
+    setImagePreview(null);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -127,6 +164,8 @@ export default function NewPosterPage() {
           paper_color: paperColor,
           attachment_type: attachmentType,
           rotation_deg: rotationDeg,
+          // Image (for demo, use preview URL; in production, upload to Blob storage)
+          image_url: imagePreview || null,
         })
         .select()
         .single();
@@ -390,6 +429,56 @@ export default function NewPosterPage() {
                 <p className="text-xs text-muted-foreground mt-1">
                   테스트할 서비스 링크, 노션 등
                 </p>
+              </div>
+
+              {/* Image attachment */}
+              <div className="pt-4 border-t border-foreground/10">
+                <p className="text-sm font-bold text-foreground mb-2">
+                  이미지 첨부 (선택)
+                </p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  서비스 화면, 결과물, 참고 이미지를 1장까지 첨부할 수 있어요.
+                  <br />
+                  최대 5MB까지 업로드 가능합니다.
+                </p>
+
+                {!imagePreview ? (
+                  <label className="block cursor-pointer">
+                    <div className="border-2 border-dashed border-foreground/20 p-6 text-center hover:border-foreground/40 transition-colors">
+                      <div className="text-3xl mb-2">&#128247;</div>
+                      <p className="text-sm text-muted-foreground">
+                        클릭하여 이미지 선택
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        jpg, jpeg, png, webp
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                  </label>
+                ) : (
+                  <div className="relative">
+                    <img
+                      src={imagePreview}
+                      alt="미리보기"
+                      className="w-full max-h-64 object-contain bg-foreground/5"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                    >
+                      &times;
+                    </button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {imageFile?.name} ({((imageFile?.size || 0) / 1024 / 1024).toFixed(2)}MB)
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Deadline section */}
