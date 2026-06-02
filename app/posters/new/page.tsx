@@ -145,6 +145,40 @@ export default function NewPosterPage() {
       const attachmentType = getRandomAttachmentType();
       const rotationDeg = getRandomRotation();
 
+      // Upload image to Supabase Storage if provided
+      let uploadedImageUrl: string | null = null;
+      if (imageFile) {
+        setUploadingImage(true);
+        
+        // Generate unique filename
+        const fileExt = imageFile.name.split(".").pop()?.toLowerCase() || "jpg";
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+        const filePath = `poster-images/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("posts")
+          .upload(filePath, imageFile, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.log("[v0] Image upload error:", uploadError.message);
+          toast.error("이미지 업로드 실패: " + uploadError.message);
+          setSubmitting(false);
+          setUploadingImage(false);
+          return;
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from("posts")
+          .getPublicUrl(filePath);
+
+        uploadedImageUrl = urlData.publicUrl;
+        setUploadingImage(false);
+      }
+
       const { data, error } = await supabase
         .from("posts")
         .insert({
@@ -164,8 +198,8 @@ export default function NewPosterPage() {
           paper_color: paperColor,
           attachment_type: attachmentType,
           rotation_deg: rotationDeg,
-          // Image (for demo, use preview URL; in production, upload to Blob storage)
-          image_url: imagePreview || null,
+          // Image URL from Supabase Storage (not blob URL)
+          image_url: uploadedImageUrl,
         })
         .select()
         .single();
@@ -648,7 +682,7 @@ export default function NewPosterPage() {
                 disabled={submitting}
                 className="w-full bg-foreground text-primary-foreground py-3 px-6 text-base font-bold hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
               >
-                {submitting ? "붙이는 중..." : "벽보 붙이기"}
+                {submitting ? (uploadingImage ? "이미지 업로드 중..." : "붙이는 중...") : "벽보 붙이기"}
               </button>
             </form>
           </div>
