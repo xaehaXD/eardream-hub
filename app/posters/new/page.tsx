@@ -1,10 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { supabase, PostCategory, categoryLabels } from "@/lib/supabase";
+import {
+  supabase,
+  PostCategory,
+  PaperType,
+  categoryLabels,
+  paperTypeLabels,
+  paperColorPalettes,
+  hashPassword,
+  parseDateInput,
+  getRandomPaperColor,
+  getRandomAttachmentType,
+  getRandomRotation,
+} from "@/lib/supabase";
 
 export default function NewPosterPage() {
   const router = useRouter();
@@ -19,6 +31,57 @@ export default function NewPosterPage() {
   const [contactValue, setContactValue] = useState("");
   const [externalLink, setExternalLink] = useState("");
 
+  // New fields
+  const [editPassword, setEditPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [hasDeadline, setHasDeadline] = useState(false);
+  const [deadlineInput, setDeadlineInput] = useState("");
+
+  // Paper selection
+  const [paperType, setPaperType] = useState<PaperType>("a4");
+
+  // Image attachment
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Generate random color when paper type changes
+  const previewColor = useMemo(() => {
+    return getRandomPaperColor(paperType);
+  }, [paperType]);
+
+  // Handle image selection
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("jpg, jpeg, png, webp 파일만 업로드 가능합니다");
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("이미지 파일은 5MB 이하만 가능합니다");
+      return;
+    }
+
+    setImageFile(file);
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+  }
+
+  function removeImage() {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImageFile(null);
+    setImagePreview(null);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -32,6 +95,40 @@ export default function NewPosterPage() {
       return;
     }
 
+    if (!editPassword.trim()) {
+      toast.error("수정/삭제용 비밀번호를 입력해주세요");
+      return;
+    }
+
+    if (editPassword.length < 4) {
+      toast.error("비밀번호는 4자 이상이어야 합니다");
+      return;
+    }
+
+    if (editPassword !== confirmPassword) {
+      toast.error("비밀번호가 일치하지 않습니다");
+      return;
+    }
+
+    // Validate deadline if provided
+    let deadline: string | null = null;
+    if (hasDeadline && deadlineInput.trim()) {
+      deadline = parseDateInput(deadlineInput);
+      if (!deadline) {
+        toast.error("마감일 형식이 올바르지 않습니다 (예: 20260711)");
+        return;
+      }
+
+      // Check if deadline is not in the past
+      const deadlineDate = new Date(deadline);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (deadlineDate < today) {
+        toast.error("마감일은 오늘 이후여야 합니다");
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     const tags = tagsInput
@@ -40,23 +137,63 @@ export default function NewPosterPage() {
       .filter((t) => t.length > 0);
 
     try {
-      const { error } = await supabase.from("posts").insert({
-        category,
-        title: title.trim(),
-        description: description.trim(),
-        tags,
-        author: author.trim(),
-        contact_type: contactType.trim(),
-        contact_value: contactValue.trim(),
-        external_link: externalLink.trim() || null,
-        status: "open",
-      });
+      // Hash the password
+      const passwordHash = await hashPassword(editPassword);
+
+      // Generate visual properties
+      const paperColor = getRandomPaperColor(paperType);
+      const attachmentType = getRandomAttachmentType();
+      const rotationDeg = getRandomRotation();
+
+      const { data, error } = await supabase
+        .from("posts")
+        .insert({
+          category,
+          title: title.trim(),
+          description: description.trim(),
+          tags,
+          author: author.trim(),
+          contact_type: contactType.trim(),
+          contact_value: contactValue.trim(),
+          external_link: externalLink.trim() || null,
+          status: "open",
+          edit_password_hash: passwordHash,
+          deadline,
+          // Visual properties
+          paper_type: paperType,
+          paper_color: paperColor,
+          attachment_type: attachmentType,
+          rotation_deg: rotationDeg,
+          // Image (for demo, use preview URL; in production, upload to Blob storage)
+          image_url: imagePreview || null,
+        })
+        .select()
+        .single();
 
       if (error) {
         console.log("[v0] Insert error:", error.message);
         toast.error("벽보 붙이기 실패: " + error.message);
         setSubmitting(false);
         return;
+      }
+
+      // Send Discord notification (fire and forget)
+      if (data) {
+        fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title.trim(),
+            category,
+            author: author.trim(),
+            contactType: contactType.trim(),
+            contactValue: contactValue.trim(),
+            deadline,
+            postId: data.id,
+          }),
+        }).catch((err) => {
+          console.log("[v0] Discord notification failed:", err);
+        });
       }
 
       toast.success("벽보가 붙여졌습니다!", {
@@ -294,12 +431,215 @@ export default function NewPosterPage() {
                 </p>
               </div>
 
-              {/* Notice */}
-              <div className="border-l-4 border-red-600 bg-white/60 p-4 text-sm leading-relaxed text-muted-foreground">
-                <p className="font-bold text-foreground mb-2">붙이기 전 확인</p>
-                <p>개인정보는 최소한으로 적어주세요.</p>
-                <p>전화번호보다는 Discord / 오픈채팅 / 링크를 추천합니다.</p>
-                <p>삭제나 수정이 필요하면 운영자에게 알려주세요.</p>
+              {/* Image attachment */}
+              <div className="pt-4 border-t border-foreground/10">
+                <p className="text-sm font-bold text-foreground mb-2">
+                  이미지 첨부 (선택)
+                </p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  서비스 화면, 결과물, 참고 이미지를 1장까지 첨부할 수 있어요.
+                  <br />
+                  최대 5MB까지 업로드 가능합니다.
+                </p>
+
+                {!imagePreview ? (
+                  <label className="block cursor-pointer">
+                    <div className="border-2 border-dashed border-foreground/20 p-6 text-center hover:border-foreground/40 transition-colors">
+                      <div className="text-3xl mb-2">&#128247;</div>
+                      <p className="text-sm text-muted-foreground">
+                        클릭하여 이미지 선택
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        jpg, jpeg, png, webp
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                  </label>
+                ) : (
+                  <div className="relative">
+                    <img
+                      src={imagePreview}
+                      alt="미리보기"
+                      className="w-full max-h-64 object-contain bg-foreground/5"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                    >
+                      &times;
+                    </button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {imageFile?.name} ({((imageFile?.size || 0) / 1024 / 1024).toFixed(2)}MB)
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Deadline section */}
+              <div className="pt-4 border-t border-foreground/10">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasDeadline}
+                    onChange={(e) => setHasDeadline(e.target.checked)}
+                    className="w-4 h-4 accent-foreground"
+                  />
+                  <span className="text-sm font-bold text-foreground">
+                    마감 기한이 있나요?
+                  </span>
+                </label>
+
+                {hasDeadline && (
+                  <div className="mt-3">
+                    <label
+                      htmlFor="deadline"
+                      className="block text-xs text-muted-foreground mb-1"
+                    >
+                      마감일 (YYYYMMDD)
+                    </label>
+                    <input
+                      id="deadline"
+                      type="text"
+                      value={deadlineInput}
+                      onChange={(e) => setDeadlineInput(e.target.value)}
+                      placeholder="20260711"
+                      className="w-full px-3 py-2 bg-white border border-foreground/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
+                      maxLength={8}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      예: 20260711 (2026년 7월 11일)
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Paper type selection */}
+              <div className="pt-4 border-t border-foreground/10">
+                <p className="text-sm font-bold text-foreground mb-3">
+                  벽보 용지 선택
+                </p>
+
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {(Object.keys(paperTypeLabels) as PaperType[]).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setPaperType(type)}
+                      className={`px-3 py-2 text-sm font-medium transition-colors ${
+                        paperType === type
+                          ? "bg-foreground text-primary-foreground"
+                          : "bg-foreground/10 text-foreground hover:bg-foreground/20"
+                      }`}
+                    >
+                      {paperTypeLabels[type]}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Preview */}
+                <div className="mt-4 p-4 bg-wall/30 rounded">
+                  <p className="text-xs text-foreground/70 mb-3 text-center">
+                    내 벽보는 이렇게 붙어요
+                  </p>
+                  <div className="flex justify-center">
+                    <div
+                      className="relative p-4 shadow-lg max-w-[200px]"
+                      style={{
+                        backgroundColor: previewColor,
+                        transform: "rotate(-1deg)",
+                        boxShadow: "3px 3px 8px rgba(0,0,0,0.2)",
+                      }}
+                    >
+                      {/* Tape */}
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-10 h-4 bg-amber-100/80 shadow-sm z-10" />
+                      
+                      {/* Paper texture */}
+                      <div
+                        className="absolute inset-0 opacity-10 pointer-events-none"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperNoise)'/%3E%3C/svg%3E")`,
+                        }}
+                      />
+
+                      <div className="relative z-10">
+                        <div className="text-xs font-bold text-foreground/80 mb-1 truncate">
+                          {title || "제목이 들어갑니다"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground line-clamp-2">
+                          {description || "내용이 여기에 표시됩니다..."}
+                        </div>
+                        
+                        {/* Tear-off bottom (for contact) */}
+                        <div className="mt-3 pt-2 border-t border-dashed border-foreground/20">
+                          <div className="flex justify-center gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <div
+                                key={i}
+                                className="w-3 h-4 border border-foreground/20 text-[6px] flex items-end justify-center pb-0.5 text-foreground/40"
+                              >
+                                연락
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-foreground/50 mt-3 text-center">
+                    색상은 {paperTypeLabels[paperType]} 팔레트에서 자동 배정
+                  </p>
+                </div>
+              </div>
+
+              {/* Password section */}
+              <div className="pt-4 border-t border-foreground/10">
+                <p className="text-sm font-bold text-foreground mb-3">
+                  수정/삭제용 비밀번호 *
+                </p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  나중에 벽보를 수정하거나 마감 처리할 때 필요해요
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      htmlFor="editPassword"
+                      className="block text-xs text-muted-foreground mb-1"
+                    >
+                      비밀번호 (4자 이상)
+                    </label>
+                    <input
+                      id="editPassword"
+                      type="password"
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                      placeholder="****"
+                      className="w-full px-3 py-2 bg-white border border-foreground/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="confirmPassword"
+                      className="block text-xs text-muted-foreground mb-1"
+                    >
+                      비밀번호 확인
+                    </label>
+                    <input
+                      id="confirmPassword"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="****"
+                      className="w-full px-3 py-2 bg-white border border-foreground/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Submit */}
