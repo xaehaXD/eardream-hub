@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Post, categoryLabels, statusLabels } from "@/lib/supabase";
+import {
+  Post,
+  categoryLabels,
+  statusLabels,
+  getEffectiveStatus,
+  getDeadlineDisplay,
+} from "@/lib/supabase";
 
 interface PosterCardProps {
   post: Post;
@@ -9,8 +15,10 @@ interface PosterCardProps {
 }
 
 export function PosterCard({ post, rotation = 0 }: PosterCardProps) {
-  const isOpen = post.status === "open";
+  const effectiveStatus = getEffectiveStatus(post);
+  const isClosed = effectiveStatus === "closed" || effectiveStatus === "expired";
   const timeAgo = getTimeAgo(post.created_at);
+  const deadlineInfo = post.deadline ? getDeadlineDisplay(post.deadline) : null;
 
   // Random tape positions for variety
   const tapeVariants = [
@@ -24,10 +32,13 @@ export function PosterCard({ post, rotation = 0 }: PosterCardProps) {
   return (
     <Link href={`/posters/${post.id}`} className="block group">
       <article
-        className="relative bg-paper p-4 sm:p-5 shadow-lg hover:shadow-xl transition-shadow duration-200"
+        className={`relative bg-paper p-4 sm:p-5 shadow-lg hover:shadow-xl transition-shadow duration-200 ${
+          isClosed ? "opacity-60" : ""
+        }`}
         style={{
           transform: `rotate(${rotation}deg)`,
-          boxShadow: "4px 4px 12px rgba(0,0,0,0.2), 1px 1px 4px rgba(0,0,0,0.15)",
+          boxShadow:
+            "4px 4px 12px rgba(0,0,0,0.2), 1px 1px 4px rgba(0,0,0,0.15)",
         }}
       >
         {/* Tape piece */}
@@ -48,25 +59,55 @@ export function PosterCard({ post, rotation = 0 }: PosterCardProps) {
         />
 
         {/* Status & Category badges */}
-        <div className="relative z-10 flex items-center gap-2 mb-3">
+        <div className="relative z-10 flex items-center gap-2 mb-3 flex-wrap">
           <span
             className={`px-2 py-0.5 text-xs font-bold ${
-              isOpen
+              effectiveStatus === "open"
                 ? "bg-green-100 text-green-800"
-                : "bg-gray-200 text-gray-600 line-through"
+                : effectiveStatus === "closed"
+                  ? "bg-gray-200 text-gray-600 line-through"
+                  : "bg-red-100 text-red-700"
             }`}
           >
-            {statusLabels[post.status]}
+            {effectiveStatus === "expired"
+              ? "기한 지남"
+              : statusLabels[post.status]}
           </span>
           <span className="px-2 py-0.5 text-xs font-medium bg-foreground/10 text-foreground">
             {categoryLabels[post.category]}
           </span>
+          {isClosed && (
+            <span className="px-2 py-0.5 text-xs font-bold bg-gray-800 text-white">
+              마감
+            </span>
+          )}
         </div>
 
         {/* Title */}
-        <h3 className="relative z-10 text-base sm:text-lg font-bold text-foreground mb-2 group-hover:text-accent transition-colors line-clamp-2">
+        <h3
+          className={`relative z-10 text-base sm:text-lg font-bold mb-2 line-clamp-2 ${
+            isClosed
+              ? "text-foreground/60"
+              : "text-foreground group-hover:text-accent transition-colors"
+          }`}
+        >
           {post.title}
         </h3>
+
+        {/* Deadline badge (if exists and not closed manually) */}
+        {deadlineInfo && deadlineInfo.label && (
+          <div
+            className={`relative z-10 inline-block mb-2 px-2 py-1 text-xs font-bold ${
+              deadlineInfo.isExpired
+                ? "bg-red-100 text-red-700"
+                : deadlineInfo.daysLeft !== null && deadlineInfo.daysLeft <= 3
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-blue-100 text-blue-700"
+            }`}
+          >
+            {deadlineInfo.isExpired ? "마감됨" : deadlineInfo.label}
+          </div>
+        )}
 
         {/* Description preview */}
         <p className="relative z-10 text-sm text-muted-foreground mb-3 line-clamp-2">

@@ -12,6 +12,7 @@ import {
   categoryLabels,
   statusLabels,
   mockPosts,
+  getEffectiveStatus,
 } from "@/lib/supabase";
 
 type FilterType = "all" | PostCategory | PostStatus;
@@ -50,12 +51,27 @@ export default function Page() {
     }
   }
 
-  const filteredPosts = posts.filter((post) => {
-    if (filter === "all") return true;
-    if (filter === "teamup" || filter === "test") return post.category === filter;
-    if (filter === "open" || filter === "closed") return post.status === filter;
-    return true;
-  });
+  const filteredPosts = posts
+    .filter((post) => {
+      if (filter === "all") return true;
+      if (filter === "teamup" || filter === "test") return post.category === filter;
+      if (filter === "open" || filter === "closed") {
+        const effectiveStatus = getEffectiveStatus(post);
+        if (filter === "open") return effectiveStatus === "open";
+        if (filter === "closed") return effectiveStatus === "closed" || effectiveStatus === "expired";
+      }
+      return true;
+    })
+    // Sort: open posts first, then closed/expired
+    .sort((a, b) => {
+      const aStatus = getEffectiveStatus(a);
+      const bStatus = getEffectiveStatus(b);
+      const aIsClosed = aStatus === "closed" || aStatus === "expired";
+      const bIsClosed = bStatus === "closed" || bStatus === "expired";
+      if (aIsClosed && !bIsClosed) return 1;
+      if (!aIsClosed && bIsClosed) return -1;
+      return 0;
+    });
 
   // Generate pseudo-random rotations for cards based on their ID
   const getRotation = (id: string, index: number) => {

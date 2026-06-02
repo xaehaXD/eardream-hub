@@ -1,21 +1,34 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, use } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
   supabase,
+  Post,
   PostCategory,
   categoryLabels,
-  hashPassword,
-  parseDateInput,
+  mockPosts,
+  canEditPost,
 } from "@/lib/supabase";
 
-export default function NewPosterPage() {
+export default function EditPosterPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
   const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
+  const searchParams = useSearchParams();
+  const verified = searchParams.get("verified") === "true";
 
+  const [post, setPost] = useState<Post | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [usingMockData, setUsingMockData] = useState(false);
+
+  // Form fields
   const [category, setCategory] = useState<PostCategory>("teamup");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -25,14 +38,78 @@ export default function NewPosterPage() {
   const [contactValue, setContactValue] = useState("");
   const [externalLink, setExternalLink] = useState("");
 
-  // New fields
-  const [editPassword, setEditPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [hasDeadline, setHasDeadline] = useState(false);
-  const [deadlineInput, setDeadlineInput] = useState("");
+  useEffect(() => {
+    if (!verified) {
+      // Redirect if not verified
+      router.replace(`/posters/${id}`);
+      return;
+    }
+    fetchPost();
+  }, [id, verified, router]);
+
+  async function fetchPost() {
+    try {
+      const { data, error } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        console.log("[v0] Supabase error, trying mock data:", error.message);
+        const mockPost = mockPosts.find((p) => p.id === id);
+        if (mockPost && canEditPost(mockPost)) {
+          initializeForm(mockPost);
+          setPost(mockPost);
+          setUsingMockData(true);
+        } else {
+          toast.error("수정 가능한 벽보를 찾을 수 없습니다");
+          router.replace(`/posters/${id}`);
+        }
+      } else if (data) {
+        if (!canEditPost(data)) {
+          toast.error("기존 게시물은 수정할 수 없습니다");
+          router.replace(`/posters/${id}`);
+          return;
+        }
+        initializeForm(data);
+        setPost(data);
+        setUsingMockData(false);
+      } else {
+        toast.error("벽보를 찾을 수 없습니다");
+        router.replace("/");
+      }
+    } catch {
+      console.log("[v0] Connection error, trying mock data");
+      const mockPost = mockPosts.find((p) => p.id === id);
+      if (mockPost && canEditPost(mockPost)) {
+        initializeForm(mockPost);
+        setPost(mockPost);
+        setUsingMockData(true);
+      } else {
+        toast.error("연결 오류가 발생했습니다");
+        router.replace(`/posters/${id}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function initializeForm(data: Post) {
+    setCategory(data.category);
+    setTitle(data.title);
+    setDescription(data.description);
+    setTagsInput(data.tags.join(", "));
+    setAuthor(data.author);
+    setContactType(data.contact_type);
+    setContactValue(data.contact_value);
+    setExternalLink(data.external_link || "");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!post) return;
 
     if (!title.trim() || !description.trim() || !author.trim()) {
       toast.error("필수 항목을 모두 입력해주세요");
@@ -44,40 +121,6 @@ export default function NewPosterPage() {
       return;
     }
 
-    if (!editPassword.trim()) {
-      toast.error("수정/삭제용 비밀번호를 입력해주세요");
-      return;
-    }
-
-    if (editPassword.length < 4) {
-      toast.error("비밀번호는 4자 이상이어야 합니다");
-      return;
-    }
-
-    if (editPassword !== confirmPassword) {
-      toast.error("비밀번호가 일치하지 않습니다");
-      return;
-    }
-
-    // Validate deadline if provided
-    let deadline: string | null = null;
-    if (hasDeadline && deadlineInput.trim()) {
-      deadline = parseDateInput(deadlineInput);
-      if (!deadline) {
-        toast.error("마감일 형식이 올바르지 않습니다 (예: 20260711)");
-        return;
-      }
-
-      // Check if deadline is not in the past
-      const deadlineDate = new Date(deadline);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (deadlineDate < today) {
-        toast.error("마감일은 오늘 이후여야 합니다");
-        return;
-      }
-    }
-
     setSubmitting(true);
 
     const tags = tagsInput
@@ -86,12 +129,9 @@ export default function NewPosterPage() {
       .filter((t) => t.length > 0);
 
     try {
-      // Hash the password
-      const passwordHash = await hashPassword(editPassword);
-
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("posts")
-        .insert({
+        .update({
           category,
           title: title.trim(),
           description: description.trim(),
@@ -100,51 +140,41 @@ export default function NewPosterPage() {
           contact_type: contactType.trim(),
           contact_value: contactValue.trim(),
           external_link: externalLink.trim() || null,
-          status: "open",
-          edit_password_hash: passwordHash,
-          deadline,
+          updated_at: new Date().toISOString(),
         })
-        .select()
-        .single();
+        .eq("id", post.id);
 
       if (error) {
-        console.log("[v0] Insert error:", error.message);
-        toast.error("벽보 붙이기 실패: " + error.message);
+        console.log("[v0] Update error:", error.message);
+        toast.error("수정 실패: " + error.message);
         setSubmitting(false);
         return;
       }
 
-      // Send Discord notification (fire and forget)
-      if (data) {
-        fetch("/api/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: title.trim(),
-            category,
-            author: author.trim(),
-            contactType: contactType.trim(),
-            contactValue: contactValue.trim(),
-            deadline,
-            postId: data.id,
-          }),
-        }).catch((err) => {
-          console.log("[v0] Discord notification failed:", err);
-        });
-      }
-
-      toast.success("벽보가 붙여졌습니다!", {
+      toast.success("벽보가 수정되었습니다!", {
         style: {
           background: "#1a1a1a",
           color: "#fff",
           border: "none",
         },
       });
-      router.push("/");
+      router.push(`/posters/${post.id}`);
     } catch {
       toast.error("연결 오류가 발생했습니다");
       setSubmitting(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-wall relative flex items-center justify-center">
+        <p className="text-paper/60">벽보 불러오는 중...</p>
+      </main>
+    );
+  }
+
+  if (!post) {
+    return null;
   }
 
   return (
@@ -164,17 +194,22 @@ export default function NewPosterPage() {
         {/* Header */}
         <header className="mb-6">
           <Link
-            href="/"
+            href={`/posters/${id}`}
             className="text-paper/80 hover:text-paper text-sm transition-colors"
           >
-            &larr; 벽보판으로
+            &larr; 돌아가기
           </Link>
           <h1 className="text-2xl sm:text-3xl font-black text-paper mt-4 mb-2">
-            벽보 붙이기
+            벽보 수정하기
           </h1>
           <p className="text-paper/70 text-sm">
-            구하는 것, 필요한 것을 적어 붙여주세요
+            내용을 수정하고 저장해주세요
           </p>
+          {usingMockData && (
+            <p className="text-amber-200/80 text-xs mt-2">
+              * 데모 모드로 표시 중
+            </p>
+          )}
         </header>
 
         {/* Form Paper */}
@@ -219,9 +254,6 @@ export default function NewPosterPage() {
                     {categoryLabels.test}
                   </CategoryButton>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  같이할래: 팀원 모집 / 써봐줘: 테스트 요청
-                </p>
               </div>
 
               {/* Title */}
@@ -368,97 +400,30 @@ export default function NewPosterPage() {
                 </p>
               </div>
 
-              {/* Deadline section */}
-              <div className="pt-4 border-t border-foreground/10">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={hasDeadline}
-                    onChange={(e) => setHasDeadline(e.target.checked)}
-                    className="w-4 h-4 accent-foreground"
-                  />
-                  <span className="text-sm font-bold text-foreground">
-                    마감 기한이 있나요?
-                  </span>
-                </label>
-
-                {hasDeadline && (
-                  <div className="mt-3">
-                    <label
-                      htmlFor="deadline"
-                      className="block text-xs text-muted-foreground mb-1"
-                    >
-                      마감일 (YYYYMMDD)
-                    </label>
-                    <input
-                      id="deadline"
-                      type="text"
-                      value={deadlineInput}
-                      onChange={(e) => setDeadlineInput(e.target.value)}
-                      placeholder="20260711"
-                      className="w-full px-3 py-2 bg-white border border-foreground/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
-                      maxLength={8}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      예: 20260711 (2026년 7월 11일)
-                    </p>
-                  </div>
-                )}
+              {/* Note about non-editable fields */}
+              <div className="bg-foreground/5 p-4 text-sm text-muted-foreground">
+                <p>
+                  <strong>수정 불가 항목:</strong> 게시물 ID, 작성일, 마감일,
+                  비밀번호
+                </p>
               </div>
 
-              {/* Password section */}
-              <div className="pt-4 border-t border-foreground/10">
-                <p className="text-sm font-bold text-foreground mb-3">
-                  수정/삭제용 비밀번호 *
-                </p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  나중에 벽보를 수정하거나 마감 처리할 때 필요해요
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label
-                      htmlFor="editPassword"
-                      className="block text-xs text-muted-foreground mb-1"
-                    >
-                      비밀번호 (4자 이상)
-                    </label>
-                    <input
-                      id="editPassword"
-                      type="password"
-                      value={editPassword}
-                      onChange={(e) => setEditPassword(e.target.value)}
-                      placeholder="****"
-                      className="w-full px-3 py-2 bg-white border border-foreground/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="confirmPassword"
-                      className="block text-xs text-muted-foreground mb-1"
-                    >
-                      비밀번호 확인
-                    </label>
-                    <input
-                      id="confirmPassword"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="****"
-                      className="w-full px-3 py-2 bg-white border border-foreground/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
-                    />
-                  </div>
-                </div>
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <Link
+                  href={`/posters/${id}`}
+                  className="flex-1 bg-foreground/10 text-foreground py-3 px-6 text-base font-bold text-center hover:bg-foreground/20 transition-colors"
+                >
+                  취소
+                </Link>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 bg-foreground text-primary-foreground py-3 px-6 text-base font-bold hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                >
+                  {submitting ? "저장 중..." : "저장하기"}
+                </button>
               </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-foreground text-primary-foreground py-3 px-6 text-base font-bold hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
-              >
-                {submitting ? "붙이는 중..." : "벽보 붙이기"}
-              </button>
             </form>
           </div>
 
