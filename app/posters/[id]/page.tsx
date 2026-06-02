@@ -450,11 +450,12 @@ export default function PosterDetailPage({
                   <h2 className="text-lg font-bold text-foreground mb-3">
                     첨부 이미지
                   </h2>
-                  <div className="bg-foreground/5 p-2">
+                  <div className="bg-foreground/5 p-2 rounded-lg">
                     <img
                       src={post.image_url}
                       alt="첨부 이미지"
-                      className="w-full max-h-96 object-contain"
+                      className="w-full max-w-full h-auto rounded"
+                      style={{ maxHeight: "24rem", objectFit: "contain" }}
                     />
                   </div>
                 </div>
