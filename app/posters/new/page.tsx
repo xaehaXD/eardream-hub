@@ -435,9 +435,6 @@ export default function NewPosterPage() {
                 <p className="text-sm font-bold text-foreground mb-3">
                   벽보 용지 선택
                 </p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  붙이는 방식과 회전은 시스템이 랜덤으로 정합니다
-                </p>
 
                 <div className="flex flex-wrap gap-2 mb-4">
                   {(Object.keys(paperTypeLabels) as PaperType[]).map((type) => (

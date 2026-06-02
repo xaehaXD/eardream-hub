@@ -17,7 +17,6 @@ import {
   formatDeadlineDate,
   verifyPassword,
   getPostVisualProps,
-  getContactMessage,
   paperTypeLabels,
 } from "@/lib/supabase";
 
@@ -43,15 +42,12 @@ export default function PosterDetailPage({
   const [showTornPaper, setShowTornPaper] = useState(false);
   const [tornPaperAnimation, setTornPaperAnimation] = useState(false);
 
-  // Feedback state (for "써봐줘" posts)
+  // Feedback state for "써봐줘" posts
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackNickname, setFeedbackNickname] = useState("");
   const [feedbackContent, setFeedbackContent] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
-
-  // 찔러보기 message copy state
-  const [messageCopied, setMessageCopied] = useState(false);
 
   // Mock view count for demo (in real implementation, fetch from DB)
   const [hasRecentViews] = useState(() => {
@@ -246,23 +242,14 @@ export default function PosterDetailPage({
     // Show torn paper popup with animation
     setTornPaperAnimation(true);
     setShowTornPaper(true);
-    // Auto-dismiss after 2.5 seconds
+    // Auto-dismiss after 1 second
     setTimeout(() => {
       setTornPaperAnimation(false);
       setTimeout(() => {
         setShowTornPaper(false);
         toast.success("연락처가 복사되었습니다");
-      }, 300);
-    }, 2200);
-  }
-
-  function copyContactMessage() {
-    if (!post) return;
-    const message = getContactMessage(post.category);
-    navigator.clipboard.writeText(message);
-    setMessageCopied(true);
-    toast.success("첫 연락 문구가 복사되었습니다");
-    setTimeout(() => setMessageCopied(false), 2000);
+      }, 200);
+    }, 800);
   }
 
   if (loading) {
@@ -478,61 +465,22 @@ export default function PosterDetailPage({
               {/* Divider */}
               <div className="my-6 h-px bg-foreground/20" />
 
-              {/* Contact section - two separate actions */}
+              {/* Contact section - simple "연락처 복사" button */}
               {!isClosed && (
                 <div className="mb-6">
                   <div className="border-t-2 border-dashed border-foreground/30 pt-4">
-                    {/* 연락처 뜯어가기 */}
-                    <div className="mb-4">
-                      <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                        연락처
-                      </h3>
-                      <div className="relative">
-                        <button
-                          onClick={handleTearContact}
-                          className="w-full py-3 px-4 bg-foreground/5 hover:bg-foreground/10 transition-colors text-foreground font-medium flex items-center justify-center gap-2 group"
-                        >
-                          <span>&#9986;</span> 연락처 뜯어가기
-                        </button>
-                        
-                        {/* Tear tabs decoration */}
-                        <div className="flex justify-center gap-1 mt-2">
-                          {[...Array(7)].map((_, i) => (
-                            <div
-                              key={i}
-                              className="w-8 h-10 border border-foreground/15 bg-white/40 flex items-end justify-center pb-1 text-[7px] text-foreground/30 hover:bg-foreground/5 transition-colors cursor-pointer"
-                              onClick={handleTearContact}
-                            >
-                              연락처
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2 text-center">
-                        = 연락처 복사
-                      </p>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="h-px bg-foreground/10 my-4" />
-
-                    {/* 찔러보기 문구 복사 */}
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                        첫 연락
-                      </h3>
-                      <button
-                        onClick={copyContactMessage}
-                        disabled={messageCopied}
-                        className="w-full py-3 px-4 bg-accent/10 hover:bg-accent/20 transition-colors text-foreground font-medium flex items-center justify-center gap-2 disabled:opacity-60"
-                      >
-                        <span>&#128204;</span> 
-                        {messageCopied ? "복사됨!" : "찔러보기 문구 복사"}
-                      </button>
-                      <p className="text-xs text-muted-foreground mt-2 text-center">
-                        = 첫 메시지 복사
-                      </p>
-                    </div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                      연락처
+                    </h3>
+                    <p className="text-sm text-foreground/70 mb-3">
+                      {post.contact_type}
+                    </p>
+                    <button
+                      onClick={handleTearContact}
+                      className="w-full py-3 px-4 bg-foreground/5 hover:bg-foreground/10 transition-colors text-foreground font-medium"
+                    >
+                      연락처 복사
+                    </button>
                   </div>
                 </div>
               )}
@@ -699,7 +647,7 @@ export default function PosterDetailPage({
               )}
 
               <p className="text-xs text-muted-foreground mt-4">
-                작성자에게 직접 연락하고 싶다면 위의 &quot;연락처 뜯어가기&quot;로 연락처를, &quot;찔러보기 문구 복사&quot;로 첫 메시지를 복사하세요.
+                작성자에게 직접 연락하고 싶다면 위의 &quot;연락처 복사&quot; 버튼을 이용해주세요.
               </p>
             </div>
           </section>
