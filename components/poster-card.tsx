@@ -3,60 +3,49 @@
 import Link from "next/link";
 import {
   Post,
+  PaperType,
+  AttachmentType,
   categoryLabels,
   statusLabels,
   getEffectiveStatus,
   getDeadlineDisplay,
+  getPostVisualProps,
 } from "@/lib/supabase";
 
 interface PosterCardProps {
   post: Post;
-  rotation?: number;
 }
 
-export function PosterCard({ post, rotation = 0 }: PosterCardProps) {
+export function PosterCard({ post }: PosterCardProps) {
   const effectiveStatus = getEffectiveStatus(post);
   const isClosed = effectiveStatus === "closed" || effectiveStatus === "expired";
   const timeAgo = getTimeAgo(post.created_at);
   const deadlineInfo = post.deadline ? getDeadlineDisplay(post.deadline) : null;
 
-  // Random tape positions for variety
-  const tapeVariants = [
-    { left: "45%", rotate: -2 },
-    { left: "40%", rotate: 3 },
-    { left: "50%", rotate: -1 },
-  ];
-  const tapeIndex = Math.abs(Math.round(rotation * 10)) % tapeVariants.length;
-  const tape = tapeVariants[tapeIndex];
+  // Get visual properties (uses stored values or deterministic defaults)
+  const { paperType, paperColor, attachmentType, rotationDeg } = getPostVisualProps(post);
+
+  // Mobile-adjusted rotation (-1 to +1)
+  const mobileRotation = rotationDeg * 0.5;
 
   return (
     <Link href={`/posters/${post.id}`} className="block group">
       <article
-        className={`relative bg-paper p-4 sm:p-5 shadow-lg hover:shadow-xl transition-shadow duration-200 ${
+        className={`relative p-4 sm:p-5 shadow-lg hover:shadow-xl transition-shadow duration-200 ${
           isClosed ? "opacity-60" : ""
         }`}
         style={{
-          transform: `rotate(${rotation}deg)`,
+          backgroundColor: paperColor,
+          transform: `rotate(${rotationDeg}deg)`,
           boxShadow:
             "4px 4px 12px rgba(0,0,0,0.2), 1px 1px 4px rgba(0,0,0,0.15)",
         }}
       >
-        {/* Tape piece */}
-        <div
-          className="absolute -top-2 w-12 h-5 bg-amber-100/80 shadow-sm z-10"
-          style={{
-            left: tape.left,
-            transform: `translateX(-50%) rotate(${tape.rotate}deg)`,
-          }}
-        />
+        {/* Attachment decoration */}
+        <AttachmentDecoration type={attachmentType} />
 
-        {/* Paper texture overlay */}
-        <div
-          className="absolute inset-0 opacity-15 pointer-events-none"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperNoise)'/%3E%3C/svg%3E")`,
-          }}
-        />
+        {/* Paper texture overlay - varies by paper type */}
+        <PaperTexture type={paperType} />
 
         {/* Status & Category badges */}
         <div className="relative z-10 flex items-center gap-2 mb-3 flex-wrap">
@@ -143,6 +132,78 @@ export function PosterCard({ post, rotation = 0 }: PosterCardProps) {
         <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors duration-200" />
       </article>
     </Link>
+  );
+}
+
+// Attachment decoration component
+function AttachmentDecoration({ type }: { type: AttachmentType }) {
+  switch (type) {
+    case "thumbtack":
+      return (
+        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 z-20">
+          <div className="w-4 h-4 rounded-full bg-red-500 shadow-md" 
+               style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.3), inset 0 1px 2px rgba(255,255,255,0.3)" }} />
+        </div>
+      );
+    case "masking_tape":
+      return (
+        <div
+          className="absolute -top-2 left-1/2 -translate-x-1/2 w-14 h-5 bg-amber-100/80 shadow-sm z-20"
+          style={{ transform: "translateX(-50%) rotate(-2deg)" }}
+        />
+      );
+    case "clear_tape":
+      return (
+        <div
+          className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 h-4 bg-white/40 shadow-sm z-20"
+          style={{ 
+            transform: "translateX(-50%) rotate(1deg)",
+            backdropFilter: "blur(1px)"
+          }}
+        />
+      );
+    case "stapler":
+      return (
+        <div className="absolute top-2 left-3 z-20">
+          <div className="w-3 h-1 bg-gray-400 rounded-sm" 
+               style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.3)" }} />
+        </div>
+      );
+    case "clip":
+      return (
+        <div className="absolute -top-3 right-4 z-20">
+          <div className="w-6 h-8 border-2 border-gray-400 rounded-sm bg-transparent"
+               style={{ borderTopLeftRadius: "10px", borderTopRightRadius: "10px" }} />
+        </div>
+      );
+    case "glue":
+      return (
+        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-b from-yellow-100/30 to-transparent z-20" />
+      );
+    default:
+      return null;
+  }
+}
+
+// Paper texture component
+function PaperTexture({ type }: { type: PaperType }) {
+  // Different texture intensities based on paper type
+  const textureOpacity = {
+    a4: 0.08,
+    memo: 0.12,
+    postit: 0.1,
+    flyer: 0.06,
+    notice: 0.18,
+  }[type];
+
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        opacity: textureOpacity,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperNoise)'/%3E%3C/svg%3E")`,
+      }}
+    />
   );
 }
 

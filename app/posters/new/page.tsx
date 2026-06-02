@@ -1,15 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
   supabase,
   PostCategory,
+  PaperType,
   categoryLabels,
+  paperTypeLabels,
+  paperColorPalettes,
   hashPassword,
   parseDateInput,
+  getRandomPaperColor,
+  getRandomAttachmentType,
+  getRandomRotation,
 } from "@/lib/supabase";
 
 export default function NewPosterPage() {
@@ -30,6 +36,14 @@ export default function NewPosterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadlineInput, setDeadlineInput] = useState("");
+
+  // Paper selection
+  const [paperType, setPaperType] = useState<PaperType>("a4");
+
+  // Generate random color when paper type changes
+  const previewColor = useMemo(() => {
+    return getRandomPaperColor(paperType);
+  }, [paperType]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,6 +103,11 @@ export default function NewPosterPage() {
       // Hash the password
       const passwordHash = await hashPassword(editPassword);
 
+      // Generate visual properties
+      const paperColor = getRandomPaperColor(paperType);
+      const attachmentType = getRandomAttachmentType();
+      const rotationDeg = getRandomRotation();
+
       const { data, error } = await supabase
         .from("posts")
         .insert({
@@ -103,6 +122,11 @@ export default function NewPosterPage() {
           status: "open",
           edit_password_hash: passwordHash,
           deadline,
+          // Visual properties
+          paper_type: paperType,
+          paper_color: paperColor,
+          attachment_type: attachmentType,
+          rotation_deg: rotationDeg,
         })
         .select()
         .single();
@@ -404,6 +428,87 @@ export default function NewPosterPage() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Paper type selection */}
+              <div className="pt-4 border-t border-foreground/10">
+                <p className="text-sm font-bold text-foreground mb-3">
+                  벽보 용지 선택
+                </p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  붙이는 방식과 회전은 시스템이 랜덤으로 정합니다
+                </p>
+
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {(Object.keys(paperTypeLabels) as PaperType[]).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setPaperType(type)}
+                      className={`px-3 py-2 text-sm font-medium transition-colors ${
+                        paperType === type
+                          ? "bg-foreground text-primary-foreground"
+                          : "bg-foreground/10 text-foreground hover:bg-foreground/20"
+                      }`}
+                    >
+                      {paperTypeLabels[type]}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Preview */}
+                <div className="mt-4 p-4 bg-wall/30 rounded">
+                  <p className="text-xs text-foreground/70 mb-3 text-center">
+                    내 벽보는 이렇게 붙어요
+                  </p>
+                  <div className="flex justify-center">
+                    <div
+                      className="relative p-4 shadow-lg max-w-[200px]"
+                      style={{
+                        backgroundColor: previewColor,
+                        transform: "rotate(-1deg)",
+                        boxShadow: "3px 3px 8px rgba(0,0,0,0.2)",
+                      }}
+                    >
+                      {/* Tape */}
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-10 h-4 bg-amber-100/80 shadow-sm z-10" />
+                      
+                      {/* Paper texture */}
+                      <div
+                        className="absolute inset-0 opacity-10 pointer-events-none"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperNoise)'/%3E%3C/svg%3E")`,
+                        }}
+                      />
+
+                      <div className="relative z-10">
+                        <div className="text-xs font-bold text-foreground/80 mb-1 truncate">
+                          {title || "제목이 들어갑니다"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground line-clamp-2">
+                          {description || "내용이 여기에 표시됩니다..."}
+                        </div>
+                        
+                        {/* Tear-off bottom (for contact) */}
+                        <div className="mt-3 pt-2 border-t border-dashed border-foreground/20">
+                          <div className="flex justify-center gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <div
+                                key={i}
+                                className="w-3 h-4 border border-foreground/20 text-[6px] flex items-end justify-center pb-0.5 text-foreground/40"
+                              >
+                                연락
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-foreground/50 mt-3 text-center">
+                    색상은 {paperTypeLabels[paperType]} 팔레트에서 자동 배정
+                  </p>
+                </div>
               </div>
 
               {/* Password section */}

@@ -73,12 +73,6 @@ export default function Page() {
       return 0;
     });
 
-  // Generate pseudo-random rotations for cards based on their ID
-  const getRotation = (id: string, index: number) => {
-    const hash = id.split("").reduce((a, b) => a + b.charCodeAt(0), 0);
-    return ((hash + index) % 5 - 2) * 0.7; // -1.4 to 1.4 degrees
-  };
-
   // Calculate how many placeholders to show
   const minCardsToShow = 6;
   const placeholderCount = Math.max(0, minCardsToShow - filteredPosts.length);
@@ -160,11 +154,10 @@ export default function Page() {
               gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
             }}
           >
-            {filteredPosts.map((post, index) => (
+            {filteredPosts.map((post) => (
               <PosterCard
                 key={post.id}
                 post={post}
-                rotation={getRotation(post.id, index)}
               />
             ))}
             {/* Placeholder cards */}

@@ -9,6 +9,73 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export type PostCategory = "teamup" | "test";
 export type PostStatus = "open" | "closed" | "expired";
 
+// Paper types and visual properties
+export type PaperType = "a4" | "memo" | "postit" | "flyer" | "notice";
+export type AttachmentType = "thumbtack" | "masking_tape" | "clear_tape" | "stapler" | "clip" | "glue";
+
+export const paperTypeLabels: Record<PaperType, string> = {
+  a4: "기본 A4",
+  memo: "메모지",
+  postit: "포스트잇",
+  flyer: "전단지",
+  notice: "공고문",
+};
+
+// Muted color palettes for each paper type (low saturation, realistic paper colors)
+export const paperColorPalettes: Record<PaperType, string[]> = {
+  a4: [
+    "#FFFFFF",     // white
+    "#FAF9F6",     // off-white
+    "#F5F5F5",     // very light gray
+  ],
+  memo: [
+    "#FFF8DC",     // light yellow/cream
+    "#FFEFD5",     // papaya whip
+    "#FFE4C4",     // light peach
+  ],
+  postit: [
+    "#FFFACD",     // lemon chiffon (light yellow)
+    "#E0F7E9",     // light mint
+    "#FFE4E8",     // light pink
+  ],
+  flyer: [
+    "#E6F3FF",     // light sky blue
+    "#F0FFF0",     // light green
+    "#FFFAF0",     // ivory
+  ],
+  notice: [
+    "#F5DEB3",     // wheat/tan paper
+    "#EEE8DC",     // faded beige
+    "#F0EDE5",     // grayish white
+  ],
+};
+
+export const attachmentTypeLabels: Record<AttachmentType, string> = {
+  thumbtack: "압정",
+  masking_tape: "마스킹테이프",
+  clear_tape: "투명테이프",
+  stapler: "스테이플러",
+  clip: "클립",
+  glue: "딱풀 자국",
+};
+
+// Get random color from paper type palette
+export function getRandomPaperColor(paperType: PaperType): string {
+  const palette = paperColorPalettes[paperType];
+  return palette[Math.floor(Math.random() * palette.length)];
+}
+
+// Get random attachment type
+export function getRandomAttachmentType(): AttachmentType {
+  const types: AttachmentType[] = ["thumbtack", "masking_tape", "clear_tape", "stapler", "clip", "glue"];
+  return types[Math.floor(Math.random() * types.length)];
+}
+
+// Get random rotation (-2 to +2 degrees for desktop, -1 to +1 for mobile)
+export function getRandomRotation(): number {
+  return (Math.random() * 4 - 2); // -2 to +2
+}
+
 export interface Post {
   id: string;
   category: PostCategory;
@@ -26,6 +93,20 @@ export interface Post {
   deadline: string | null; // YYYY-MM-DD format
   updated_at: string | null;
   closed_at: string | null;
+  // Visual properties (nullable for legacy posts - use defaults)
+  paper_type: PaperType | null;
+  paper_color: string | null;
+  attachment_type: AttachmentType | null;
+  rotation_deg: number | null;
+}
+
+// Feedback type for "써봐줘" posts
+export interface Feedback {
+  id: string;
+  post_id: string;
+  nickname: string;
+  content: string;
+  created_at: string;
 }
 
 // Label mappings for UI display
@@ -155,6 +236,39 @@ export function getEffectiveStatus(post: Post): PostStatus {
   return "open";
 }
 
+// Get visual properties with defaults for legacy posts
+export function getPostVisualProps(post: Post): {
+  paperType: PaperType;
+  paperColor: string;
+  attachmentType: AttachmentType;
+  rotationDeg: number;
+} {
+  // Use stored values or generate deterministic defaults based on post ID
+  const hash = post.id.split("").reduce((a, b) => a + b.charCodeAt(0), 0);
+  
+  const paperType = post.paper_type || "a4";
+  const paperColor = post.paper_color || paperColorPalettes[paperType][hash % paperColorPalettes[paperType].length];
+  const attachmentType = post.attachment_type || (["thumbtack", "masking_tape", "clear_tape", "stapler", "clip", "glue"] as AttachmentType[])[hash % 6];
+  const rotationDeg = post.rotation_deg ?? ((hash % 5) - 2) * 0.7;
+  
+  return { paperType, paperColor, attachmentType, rotationDeg };
+}
+
+// Contact message templates for "찔러보기"
+export function getContactMessage(category: PostCategory): string {
+  if (category === "teamup") {
+    return `안녕하세요.
+이어드림 허브에서 보고 연락드립니다.
+
+모집하시는 역할에 관심이 있어 연락드립니다.`;
+  } else {
+    return `안녕하세요.
+이어드림 허브에서 보고 연락드립니다.
+
+서비스를 사용해보고 피드백을 드리고 싶어 연락드립니다.`;
+  }
+}
+
 // Mock data for development/demo (when Supabase is not connected)
 export const mockPosts: Post[] = [
   {
@@ -174,6 +288,10 @@ export const mockPosts: Post[] = [
     deadline: null,
     updated_at: null,
     closed_at: null,
+    paper_type: "a4",
+    paper_color: "#FAF9F6",
+    attachment_type: "masking_tape",
+    rotation_deg: 1.2,
   },
   {
     id: "2",
@@ -192,6 +310,10 @@ export const mockPosts: Post[] = [
     deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString().split("T")[0], // 7 days from now
     updated_at: null,
     closed_at: null,
+    paper_type: "postit",
+    paper_color: "#FFFACD",
+    attachment_type: "thumbtack",
+    rotation_deg: -0.8,
   },
   {
     id: "3",
@@ -210,6 +332,10 @@ export const mockPosts: Post[] = [
     deadline: null,
     updated_at: null,
     closed_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+    paper_type: "notice",
+    paper_color: "#F5DEB3",
+    attachment_type: "stapler",
+    rotation_deg: 0.5,
   },
   {
     id: "4",
@@ -228,5 +354,9 @@ export const mockPosts: Post[] = [
     deadline: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString().split("T")[0], // 2 days ago (expired)
     updated_at: null,
     closed_at: null,
+    paper_type: "flyer",
+    paper_color: "#E6F3FF",
+    attachment_type: "clear_tape",
+    rotation_deg: -1.5,
   },
 ];

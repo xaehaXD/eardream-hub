@@ -404,7 +404,7 @@ export default function EditPosterPage({
               <div className="bg-foreground/5 p-4 text-sm text-muted-foreground">
                 <p>
                   <strong>수정 불가 항목:</strong> 게시물 ID, 작성일, 마감일,
-                  비밀번호
+                  비밀번호, 벽보 용지/색상/부착 방식
                 </p>
               </div>
 

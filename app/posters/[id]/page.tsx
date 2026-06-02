@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   supabase,
   Post,
+  Feedback,
   categoryLabels,
   statusLabels,
   mockPosts,
@@ -15,6 +16,9 @@ import {
   getDeadlineDisplay,
   formatDeadlineDate,
   verifyPassword,
+  getPostVisualProps,
+  getContactMessage,
+  paperTypeLabels,
 } from "@/lib/supabase";
 
 export default function PosterDetailPage({
@@ -35,9 +39,29 @@ export default function PosterDetailPage({
   const [passwordInput, setPasswordInput] = useState("");
   const [verifying, setVerifying] = useState(false);
 
+  // Contact tear-off state (local only)
+  const [contactRevealed, setContactRevealed] = useState(false);
+  const [tearAnimation, setTearAnimation] = useState(false);
+
+  // Feedback state (for "써봐줘" posts)
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackNickname, setFeedbackNickname] = useState("");
+  const [feedbackContent, setFeedbackContent] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
+  // 찔러보기 message modal
+  const [showContactMessage, setShowContactMessage] = useState(false);
+
   useEffect(() => {
     fetchPost();
   }, [id]);
+
+  useEffect(() => {
+    if (post?.category === "test") {
+      fetchFeedbacks();
+    }
+  }, [post?.id, post?.category]);
 
   async function fetchPost() {
     try {
@@ -73,6 +97,51 @@ export default function PosterDetailPage({
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchFeedbacks() {
+    if (!post?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from("feedbacks")
+        .select("*")
+        .eq("post_id", post.id)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setFeedbacks(data);
+      }
+    } catch {
+      console.log("[v0] Failed to fetch feedbacks");
+    }
+  }
+
+  async function handleSubmitFeedback(e: React.FormEvent) {
+    e.preventDefault();
+    if (!post || !feedbackNickname.trim() || !feedbackContent.trim()) return;
+
+    setSubmittingFeedback(true);
+    try {
+      const { error } = await supabase.from("feedbacks").insert({
+        post_id: post.id,
+        nickname: feedbackNickname.trim(),
+        content: feedbackContent.trim(),
+      });
+
+      if (error) {
+        toast.error("피드백 저장 실패: " + error.message);
+      } else {
+        toast.success("피드백이 등록되었습니다");
+        setFeedbackNickname("");
+        setFeedbackContent("");
+        setShowFeedbackForm(false);
+        fetchFeedbacks();
+      }
+    } catch {
+      toast.error("연결 오류가 발생했습니다");
+    } finally {
+      setSubmittingFeedback(false);
     }
   }
 
@@ -116,10 +185,8 @@ export default function PosterDetailPage({
       }
 
       if (modalMode === "edit") {
-        // Navigate to edit page with verified state
         router.push(`/posters/${post.id}/edit?verified=true`);
       } else {
-        // Close the post
         await closePost();
       }
     } catch {
@@ -158,13 +225,28 @@ export default function PosterDetailPage({
       setShowPasswordModal(false);
       setPasswordInput("");
       setVerifying(false);
-
-      // Refresh the post
       fetchPost();
     } catch {
       toast.error("연결 오류가 발생했습니다");
       setVerifying(false);
     }
+  }
+
+  function handleTearContact() {
+    if (contactRevealed) return;
+    setTearAnimation(true);
+    setTimeout(() => {
+      setContactRevealed(true);
+      setTearAnimation(false);
+    }, 600);
+  }
+
+  function copyContactMessage() {
+    if (!post) return;
+    const message = getContactMessage(post.category);
+    navigator.clipboard.writeText(message);
+    toast.success("문구가 복사되었습니다");
+    setShowContactMessage(false);
   }
 
   if (loading) {
@@ -195,6 +277,7 @@ export default function PosterDetailPage({
   const isClosed = effectiveStatus === "closed" || effectiveStatus === "expired";
   const hasEditPassword = canEditPost(post);
   const deadlineInfo = post.deadline ? getDeadlineDisplay(post.deadline) : null;
+  const { paperType, paperColor } = getPostVisualProps(post);
 
   const formattedDate = new Date(post.created_at).toLocaleDateString("ko-KR", {
     year: "numeric",
@@ -252,10 +335,11 @@ export default function PosterDetailPage({
           <div className="absolute -top-2 right-[12%] w-16 h-5 bg-amber-100/60 rotate-[-3deg] shadow-sm z-20 hidden sm:block" />
 
           <div
-            className={`relative bg-paper p-6 sm:p-10 shadow-2xl rotate-[0.3deg] ${
+            className={`relative p-6 sm:p-10 shadow-2xl rotate-[0.3deg] ${
               isClosed ? "opacity-75" : ""
             }`}
             style={{
+              backgroundColor: paperColor,
               boxShadow:
                 "8px 8px 20px rgba(0,0,0,0.3), 2px 2px 8px rgba(0,0,0,0.2)",
             }}
@@ -357,32 +441,6 @@ export default function PosterDetailPage({
                 </div>
               )}
 
-              {/* Divider */}
-              <div className="my-6 h-px bg-foreground/20" />
-
-              {/* Contact section */}
-              <div className="mb-6">
-                <h2 className="text-lg font-bold text-foreground mb-3">
-                  찔러보기
-                </h2>
-                {isClosed ? (
-                  <div className="bg-gray-100 p-4 text-center">
-                    <p className="text-gray-600 font-medium">
-                      마감된 게시물입니다
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-foreground/5 p-4">
-                    <div className="flex items-center gap-2 text-foreground">
-                      <span className="font-medium">{post.contact_type}:</span>
-                      <span className="text-accent font-bold">
-                        {post.contact_value}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* External link */}
               {post.external_link && !isClosed && (
                 <div className="mb-6">
@@ -398,6 +456,75 @@ export default function PosterDetailPage({
                     {post.external_link}
                     <span className="text-xs">&nearr;</span>
                   </a>
+                </div>
+              )}
+
+              {/* Divider */}
+              <div className="my-6 h-px bg-foreground/20" />
+
+              {/* Contact tear-off section */}
+              {!isClosed && (
+                <div className="mb-6">
+                  <div className="border-t-2 border-dashed border-foreground/30 pt-4">
+                    {!contactRevealed ? (
+                      <div className="relative">
+                        <button
+                          onClick={handleTearContact}
+                          className={`w-full py-3 px-4 bg-foreground/5 hover:bg-foreground/10 transition-colors text-foreground font-medium flex items-center justify-center gap-2 ${
+                            tearAnimation ? "animate-pulse" : ""
+                          }`}
+                        >
+                          <span>&#9986;</span> 연락처 뜯어가기
+                        </button>
+                        
+                        {/* Tear tabs */}
+                        <div className="flex justify-center gap-1 mt-2">
+                          {[...Array(7)].map((_, i) => (
+                            <div
+                              key={i}
+                              className={`w-8 h-12 border border-foreground/20 bg-white/50 flex items-end justify-center pb-1 text-[8px] text-foreground/40 transition-transform duration-300 ${
+                                tearAnimation ? "translate-y-2 opacity-50" : ""
+                              }`}
+                              style={{
+                                transitionDelay: `${i * 50}ms`,
+                              }}
+                            >
+                              연락처
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-foreground/5 p-4">
+                        <div className="flex items-center gap-2 text-foreground mb-3">
+                          <span className="font-medium">{post.contact_type}:</span>
+                          <span className="text-accent font-bold">
+                            {post.contact_value}
+                          </span>
+                        </div>
+                        
+                        {/* 찔러보기 button */}
+                        <button
+                          onClick={() => setShowContactMessage(true)}
+                          className="w-full py-2 px-4 bg-accent text-accent-foreground font-medium hover:bg-accent/90 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <span>&#128204;</span> 찔러보기
+                        </button>
+                        <p className="text-xs text-muted-foreground mt-2 text-center">
+                          첫 연락 문구를 자동으로 생성해드려요
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Closed notice */}
+              {isClosed && (
+                <div className="mb-6 bg-gray-100 p-4 text-center">
+                  <p className="text-gray-600 font-medium">
+                    마감된 게시물입니다
+                  </p>
                 </div>
               )}
 
@@ -448,6 +575,109 @@ export default function PosterDetailPage({
           {/* Paper corner effect */}
           <div className="absolute bottom-0 right-0 w-4 h-4 bg-wall rotate-45 translate-x-1 translate-y-1" />
         </article>
+
+        {/* Feedback section for "써봐줘" posts */}
+        {post.category === "test" && !isClosed && (
+          <section className="mt-8">
+            <div className="bg-paper/90 p-6 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-foreground">
+                  공개 피드백 ({feedbacks.length})
+                </h2>
+                {!showFeedbackForm && (
+                  <button
+                    onClick={() => setShowFeedbackForm(true)}
+                    className="px-4 py-2 text-sm font-medium bg-accent text-accent-foreground hover:bg-accent/90 transition-colors flex items-center gap-2"
+                  >
+                    <span>&#128172;</span> 공개 피드백 남기기
+                  </button>
+                )}
+              </div>
+
+              {/* Feedback form */}
+              {showFeedbackForm && (
+                <form onSubmit={handleSubmitFeedback} className="mb-6 p-4 bg-foreground/5">
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      닉네임
+                    </label>
+                    <input
+                      type="text"
+                      value={feedbackNickname}
+                      onChange={(e) => setFeedbackNickname(e.target.value)}
+                      placeholder="닉네임을 입력하세요"
+                      className="w-full px-3 py-2 bg-white border border-foreground/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                      maxLength={30}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      피드백 내용
+                    </label>
+                    <textarea
+                      value={feedbackContent}
+                      onChange={(e) => setFeedbackContent(e.target.value)}
+                      placeholder="피드백을 작성해주세요"
+                      rows={3}
+                      className="w-full px-3 py-2 bg-white border border-foreground/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 resize-none"
+                      maxLength={500}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowFeedbackForm(false)}
+                      className="px-4 py-2 text-sm font-medium bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingFeedback || !feedbackNickname.trim() || !feedbackContent.trim()}
+                      className="px-4 py-2 text-sm font-medium bg-foreground text-primary-foreground hover:bg-foreground/90 transition-colors disabled:opacity-50"
+                    >
+                      {submittingFeedback ? "등록 중..." : "피드백 등록"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Feedback list */}
+              {feedbacks.length > 0 ? (
+                <div className="space-y-4">
+                  {feedbacks.map((feedback) => (
+                    <div key={feedback.id} className="p-3 bg-white/50 border border-foreground/10">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-foreground text-sm">
+                          {feedback.nickname}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(feedback.created_at).toLocaleDateString("ko-KR", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
+                        {feedback.content}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  아직 피드백이 없습니다. 첫 피드백을 남겨보세요!
+                </p>
+              )}
+
+              <p className="text-xs text-muted-foreground mt-4">
+                작성자에게 직접 연락하고 싶다면 위의 &quot;연락처 뜯어가기&quot; 또는 &quot;찔러보기&quot;를 이용해주세요.
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* Back button */}
         <div className="mt-8 text-center">
@@ -513,6 +743,39 @@ export default function PosterDetailPage({
                   : modalMode === "edit"
                     ? "수정하기"
                     : "마감하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contact Message Modal (찔러보기) */}
+      {showContactMessage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-paper p-6 sm:p-8 max-w-md w-full shadow-2xl">
+            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <span>&#128204;</span> 찔러보기
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              아래 문구를 복사해서 첫 연락에 사용하세요.
+            </p>
+            <div className="bg-foreground/5 p-4 mb-4">
+              <pre className="text-sm text-foreground whitespace-pre-wrap font-sans">
+                {getContactMessage(post.category)}
+              </pre>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowContactMessage(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors"
+              >
+                닫기
+              </button>
+              <button
+                onClick={copyContactMessage}
+                className="flex-1 px-4 py-2 text-sm font-medium bg-foreground text-primary-foreground hover:bg-foreground/90 transition-colors"
+              >
+                문구 복사하기
               </button>
             </div>
           </div>
