@@ -50,28 +50,78 @@ export default function NewPosterPage() {
     return getRandomPaperColor(paperType);
   }, [paperType]);
 
-  // Handle image selection
+  // Handle image selection with strict validation
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
+    // 1. MIME type 검증 (허용: jpg, jpeg, png, webp)
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedMimeTypes.includes(file.type)) {
       toast.error("jpg, jpeg, png, webp 파일만 업로드 가능합니다");
       return;
     }
 
-    // Validate file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    // 2. 확장자 검증 (금지: svg, gif, pdf, html, js)
+    const fileName = file.name.toLowerCase();
+    const ext = fileName.split(".").pop() || "";
+    const allowedExtensions = ["jpg", "jpeg", "png", "webp"];
+    const forbiddenExtensions = ["svg", "gif", "pdf", "html", "js", "htm", "exe"];
+    
+    if (!allowedExtensions.includes(ext)) {
+      toast.error("jpg, jpeg, png, webp 확장자만 허용됩니다");
+      return;
+    }
+    
+    if (forbiddenExtensions.includes(ext)) {
+      toast.error("허용되지 않는 파일 형식입니다");
+      return;
+    }
+
+    // 3. 파일 크기 검증 (5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
       toast.error("이미지 파일은 5MB 이하만 가능합니다");
       return;
     }
 
     setImageFile(file);
-    // Create preview URL
+    // Create preview URL (blob URL - only for preview, not stored in DB)
     const previewUrl = URL.createObjectURL(file);
     setImagePreview(previewUrl);
+  }
+
+  // Convert image to webp format using canvas
+  async function convertToWebp(file: File): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas context not available"));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("Failed to convert image"));
+            }
+          },
+          "image/webp",
+          0.85 // quality
+        );
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = URL.createObjectURL(file);
+    });
   }
 
   function removeImage() {
@@ -150,32 +200,42 @@ export default function NewPosterPage() {
       if (imageFile) {
         setUploadingImage(true);
         
-        // Generate unique filename
-        const fileExt = imageFile.name.split(".").pop()?.toLowerCase() || "jpg";
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-        const filePath = `poster-images/${fileName}`;
+        try {
+          // Convert to webp format
+          const webpBlob = await convertToWebp(imageFile);
+          
+          // Generate unique filename (timestamp + random string, always .webp)
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.webp`;
+          const filePath = `poster-images/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from("posts")
-          .upload(filePath, imageFile, {
-            cacheControl: "3600",
-            upsert: false,
-          });
+          const { error: uploadError } = await supabase.storage
+            .from("posts")
+            .upload(filePath, webpBlob, {
+              cacheControl: "3600",
+              upsert: false,
+              contentType: "image/webp",
+            });
 
-        if (uploadError) {
-          console.log("[v0] Image upload error:", uploadError.message);
-          toast.error("이미지 업로드 실패: " + uploadError.message);
+          if (uploadError) {
+            toast.error("이미지 업로드 실패: " + uploadError.message);
+            setSubmitting(false);
+            setUploadingImage(false);
+            return;
+          }
+
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from("posts")
+            .getPublicUrl(filePath);
+
+          uploadedImageUrl = urlData.publicUrl;
+        } catch (convertError) {
+          toast.error("이미지 변환 실패");
           setSubmitting(false);
           setUploadingImage(false);
           return;
         }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from("posts")
-          .getPublicUrl(filePath);
-
-        uploadedImageUrl = urlData.publicUrl;
+        
         setUploadingImage(false);
       }
 

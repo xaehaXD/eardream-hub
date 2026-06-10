@@ -15,10 +15,13 @@ import {
   getEffectiveStatus,
   getDeadlineDisplay,
   formatDeadlineDate,
-  verifyPassword,
   getPostVisualProps,
   paperTypeLabels,
 } from "@/lib/supabase";
+import {
+  verifyPostPassword,
+  closePost as closePostAction,
+} from "@/app/actions/posts";
 
 export default function PosterDetailPage({
   params,
@@ -176,21 +179,22 @@ export default function PosterDetailPage({
     setVerifying(true);
 
     try {
-      const isValid = await verifyPassword(
-        passwordInput,
-        post.edit_password_hash!
-      );
+      // Verify the password on the server (never trust client-side checks).
+      const result = await verifyPostPassword(post.id, passwordInput);
 
-      if (!isValid) {
-        toast.error("비밀번호가 일치하지 않습니다");
+      if (!result.success) {
+        toast.error(result.error || "비밀번호가 일치하지 않습니다");
         setVerifying(false);
         return;
       }
 
       if (modalMode === "edit") {
+        // Stash the verified password so the edit page can authorize the
+        // server-side UPDATE. sessionStorage is cleared after the edit.
+        sessionStorage.setItem(`edit_password_${post.id}`, passwordInput);
         router.push(`/posters/${post.id}/edit?verified=true`);
       } else {
-        await closePost();
+        await closePost(passwordInput);
       }
     } catch {
       toast.error("오류가 발생했습니다");
@@ -198,21 +202,16 @@ export default function PosterDetailPage({
     }
   }
 
-  async function closePost() {
+  async function closePost(password: string) {
     if (!post) return;
 
     try {
-      const { error } = await supabase
-        .from("posts")
-        .update({
-          status: "closed",
-          closed_at: new Date().toISOString(),
-        })
-        .eq("id", post.id);
+      // The close action re-verifies the password server-side and performs
+      // the UPDATE with the service-role client.
+      const result = await closePostAction(post.id, password);
 
-      if (error) {
-        console.log("[v0] Close error:", error.message);
-        toast.error("마감 처리 실패: " + error.message);
+      if (!result.success) {
+        toast.error(result.error || "마감 처리에 실패했습니다");
         setVerifying(false);
         return;
       }

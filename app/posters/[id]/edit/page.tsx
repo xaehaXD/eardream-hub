@@ -12,6 +12,7 @@ import {
   mockPosts,
   canEditPost,
 } from "@/lib/supabase";
+import { updatePost } from "@/app/actions/posts";
 
 export default function EditPosterPage({
   params,
@@ -27,6 +28,8 @@ export default function EditPosterPage({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [usingMockData, setUsingMockData] = useState(false);
+  // Password captured during server-side verification on the detail page.
+  const [editPassword, setEditPassword] = useState("");
 
   // Form fields
   const [category, setCategory] = useState<PostCategory>("teamup");
@@ -39,11 +42,19 @@ export default function EditPosterPage({
   const [externalLink, setExternalLink] = useState("");
 
   useEffect(() => {
-    if (!verified) {
-      // Redirect if not verified
+    // The detail page stores the server-verified password in sessionStorage
+    // under this key. Without it, we cannot authorize the update.
+    const storedPassword =
+      typeof window !== "undefined"
+        ? sessionStorage.getItem(`edit_password_${id}`)
+        : null;
+
+    if (!verified || !storedPassword) {
+      // Redirect if not verified through the proper server-side flow.
       router.replace(`/posters/${id}`);
       return;
     }
+    setEditPassword(storedPassword);
     fetchPost();
   }, [id, verified, router]);
 
@@ -129,27 +140,28 @@ export default function EditPosterPage({
       .filter((t) => t.length > 0);
 
     try {
-      const { error } = await supabase
-        .from("posts")
-        .update({
-          category,
-          title: title.trim(),
-          description: description.trim(),
-          tags,
-          author: author.trim(),
-          contact_type: contactType.trim(),
-          contact_value: contactValue.trim(),
-          external_link: externalLink.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", post.id);
+      // All updates go through the server action, which re-verifies the
+      // password on the server and performs the UPDATE with the service-role
+      // client. The client never touches RLS-protected writes directly.
+      const result = await updatePost(post.id, editPassword, {
+        category,
+        title,
+        description,
+        tags,
+        author,
+        contact_type: contactType,
+        contact_value: contactValue,
+        external_link: externalLink || null,
+      });
 
-      if (error) {
-        console.log("[v0] Update error:", error.message);
-        toast.error("수정 실패: " + error.message);
+      if (!result.success) {
+        toast.error(result.error || "수정에 실패했습니다");
         setSubmitting(false);
         return;
       }
+
+      // Clean up the stored password now that the edit is complete.
+      sessionStorage.removeItem(`edit_password_${post.id}`);
 
       toast.success("벽보가 수정되었습니다!", {
         style: {
@@ -340,7 +352,7 @@ export default function EditPosterPage({
                   찔러보기 정보 *
                 </p>
                 <p className="text-xs text-muted-foreground mb-4">
-                  관심 있는 사람이 연락할 수단을 남겨주세요
+                  ���심 있는 사람이 연락할 수단을 남겨주세요
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -356,7 +368,7 @@ export default function EditPosterPage({
                       type="text"
                       value={contactType}
                       onChange={(e) => setContactType(e.target.value)}
-                      placeholder="카카오톡, 이메일, 디스코드"
+                      placeholder="카카오톡, 이메일, 디스코��"
                       className="w-full px-3 py-2 bg-white border border-foreground/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
                     />
                   </div>
