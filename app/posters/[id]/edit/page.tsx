@@ -352,7 +352,7 @@ export default function EditPosterPage({
                   찔러보기 정보 *
                 </p>
                 <p className="text-xs text-muted-foreground mb-4">
-                  관심 있는 사람이 연락할 수단을 남겨주세요
+                  ���심 있는 사람이 연락할 수단을 남겨주세요
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
