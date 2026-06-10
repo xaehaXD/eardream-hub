@@ -129,7 +129,9 @@ export default function EditPosterPage({
       .filter((t) => t.length > 0);
 
     try {
-      const { error } = await supabase
+      // .select() lets us detect how many rows were actually updated.
+      // If RLS blocks the UPDATE, Supabase returns no error but 0 rows.
+      const { data: updatedRows, error } = await supabase
         .from("posts")
         .update({
           category,
@@ -142,11 +144,20 @@ export default function EditPosterPage({
           external_link: externalLink.trim() || null,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", post.id);
+        .eq("id", post.id)
+        .select();
 
       if (error) {
-        console.log("[v0] Update error:", error.message);
         toast.error("수정 실패: " + error.message);
+        setSubmitting(false);
+        return;
+      }
+
+      if (!updatedRows || updatedRows.length === 0) {
+        // UPDATE was silently blocked (RLS UPDATE policy missing on posts table)
+        toast.error(
+          "수정이 저장되지 않았습니다. 관리자에게 문의해주세요 (DB 권한 설정 필요)"
+        );
         setSubmitting(false);
         return;
       }

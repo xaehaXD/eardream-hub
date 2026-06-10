@@ -202,17 +202,26 @@ export default function PosterDetailPage({
     if (!post) return;
 
     try {
-      const { error } = await supabase
+      const { data: updatedRows, error } = await supabase
         .from("posts")
         .update({
           status: "closed",
           closed_at: new Date().toISOString(),
         })
-        .eq("id", post.id);
+        .eq("id", post.id)
+        .select();
 
       if (error) {
-        console.log("[v0] Close error:", error.message);
         toast.error("마감 처리 실패: " + error.message);
+        setVerifying(false);
+        return;
+      }
+
+      if (!updatedRows || updatedRows.length === 0) {
+        // UPDATE was silently blocked (RLS UPDATE policy missing on posts table)
+        toast.error(
+          "마감 처리가 저장되지 않았습니다. 관리자에게 문의해주세요 (DB 권한 설정 필요)"
+        );
         setVerifying(false);
         return;
       }
