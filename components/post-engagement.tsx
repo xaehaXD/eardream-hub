@@ -170,23 +170,32 @@ export function PostEngagement({ post }: PostEngagementProps) {
 
     try {
       const excerpt = post.description.slice(0, 100);
+      const shareUrl = url;
+      // Kakao requires an absolute https image URL. Use the post image only
+      // when it is already an absolute http(s) URL, otherwise fall back to the
+      // canonical default OG image built from NEXT_PUBLIC_SITE_URL.
+      const imageUrl = post.image_url?.startsWith("http")
+        ? post.image_url
+        : `${getShareOrigin()}/og-default.png`;
+
+      console.log("[Kakao Share URL]", shareUrl);
+      console.log("[Kakao Image URL]", imageUrl);
+
       kakao.Share.sendDefault({
         objectType: "feed",
         content: {
           title: post.title,
           description: `벽보 한 장 뜯어왔어요 👀\n${excerpt}`,
-          imageUrl:
-            post.image_url ||
-            `${getShareOrigin()}/og-default.png`,
+          imageUrl,
           link: {
-            mobileWebUrl: url,
-            webUrl: url,
+            mobileWebUrl: shareUrl,
+            webUrl: shareUrl,
           },
         },
         buttons: [
           {
             title: "벽보 보러가기",
-            link: { mobileWebUrl: url, webUrl: url },
+            link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
           },
         ],
       });
