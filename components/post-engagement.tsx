@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Script from "next/script";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   supabase,
   Post,
@@ -25,6 +26,7 @@ export function PostEngagement({ post }: PostEngagementProps) {
   const [upvoteCount, setUpvoteCount] = useState(0);
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
 
@@ -67,7 +69,7 @@ export function PostEngagement({ post }: PostEngagementProps) {
   async function handleUpvote() {
     if (submitting) return;
     if (hasUpvoted) {
-      toast("이미 찍었어요.");
+      toast("이미 추천했어요.");
       return;
     }
     setSubmitting(true);
@@ -84,19 +86,19 @@ export function PostEngagement({ post }: PostEngagementProps) {
       if (error) {
         // Unique violation -> already upvoted (de-dup). Anything else: revert.
         if (error.code === "23505") {
-          toast("이미 찍었어요.");
+          toast("이미 추천했어요.");
         } else {
           setHasUpvoted(false);
           setUpvoteCount((c) => Math.max(0, c - 1));
-          toast.error("따봉 저장에 실패했어요.");
+          toast.error("추천 저장에 실패했어요.");
         }
       } else {
-        toast.success("따봉 찍혔어요.");
+        toast.success("추천했어요.");
       }
     } catch {
       setHasUpvoted(false);
       setUpvoteCount((c) => Math.max(0, c - 1));
-      toast.error("따봉 저장에 실패했어요.");
+      toast.error("추천 저장에 실패했어요.");
     } finally {
       setSubmitting(false);
     }
@@ -125,10 +127,12 @@ export function PostEngagement({ post }: PostEngagementProps) {
     const text = buildShareText(post, getCurrentUrl());
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("링크 포함해서 복사됐어요.");
+      toast.success("내용과 링크를 복사했어요.");
       logShare("copy");
     } catch {
       toast.error("복사에 실패했어요. 링크를 직접 복사해주세요.");
+    } finally {
+      setShareOpen(false);
     }
   }
 
@@ -177,6 +181,7 @@ export function PostEngagement({ post }: PostEngagementProps) {
         ],
       });
       logShare("kakao");
+      setShareOpen(false);
     } catch {
       // Any runtime failure -> fallback to copy.
       copyShareText();
@@ -202,44 +207,58 @@ export function PostEngagement({ post }: PostEngagementProps) {
       )}
 
       <div className="my-6 border-t-2 border-dashed border-foreground/30 pt-5">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          {/* Upvote stamp */}
+        <div className="flex flex-wrap items-stretch gap-2">
+          {/* Upvote */}
           <button
             onClick={handleUpvote}
             disabled={submitting}
             aria-pressed={hasUpvoted}
-            aria-label="따봉"
-            className={`relative shrink-0 flex flex-col items-center justify-center w-16 h-16 -rotate-3 border-2 transition-all active:scale-95 ${
+            aria-label="추천"
+            className={`inline-flex h-11 items-center justify-center gap-1.5 px-4 text-sm font-bold border-2 transition-colors active:scale-95 ${
               hasUpvoted
-                ? "bg-amber-200 border-amber-500 text-amber-900 shadow-inner"
-                : "bg-paper border-foreground/40 text-foreground hover:bg-amber-50 hover:border-amber-400 shadow-sm"
+                ? "bg-amber-200 border-amber-500 text-amber-900"
+                : "bg-paper border-foreground/40 text-foreground hover:bg-amber-50 hover:border-amber-400"
             }`}
           >
-            <span className="text-2xl leading-none" aria-hidden="true">
+            <span className="text-lg leading-none" aria-hidden="true">
               &#128077;
             </span>
             {upvoteCount > 0 && (
-              <span className="text-xs font-bold leading-none mt-0.5">
-                {upvoteCount}
-              </span>
+              <span className="leading-none tabular-nums">{upvoteCount}</span>
             )}
           </button>
 
-          {/* Share scraps */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleKakaoShare}
-              className="px-4 py-2 text-sm font-bold rotate-1 bg-[#FEE500] text-[#3C1E1E] border border-yellow-500/60 shadow-sm hover:brightness-95 active:scale-95 transition-all"
+          {/* Share */}
+          <Popover open={shareOpen} onOpenChange={setShareOpen}>
+            <PopoverTrigger asChild>
+              <button
+                aria-label="공유하기"
+                className="inline-flex h-11 items-center justify-center px-4 text-sm font-bold bg-paper border-2 border-foreground/40 text-foreground hover:bg-foreground/5 active:scale-95 transition-colors"
+              >
+                공유하기
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              className="w-56 p-3 border-2 border-foreground/30 bg-paper"
             >
-              카톡으로
-            </button>
-            <button
-              onClick={copyShareText}
-              className="px-4 py-2 text-sm font-bold -rotate-1 bg-paper text-foreground border border-foreground/40 shadow-sm hover:bg-foreground/5 active:scale-95 transition-all"
-            >
-              링크포함
-            </button>
-          </div>
+              <p className="text-sm font-bold text-foreground mb-2">공유하기</p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleKakaoShare}
+                  className="inline-flex h-10 items-center justify-center px-3 text-sm font-bold bg-[#FEE500] text-[#3C1E1E] border border-yellow-500/60 hover:brightness-95 active:scale-95 transition-all"
+                >
+                  카톡 공유
+                </button>
+                <button
+                  onClick={copyShareText}
+                  className="inline-flex h-10 items-center justify-center px-3 text-sm font-bold bg-background text-foreground border border-foreground/40 hover:bg-foreground/5 active:scale-95 transition-all"
+                >
+                  내용포함 복사
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </>
