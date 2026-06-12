@@ -118,9 +118,19 @@ export function PostEngagement({ post }: PostEngagementProps) {
       });
   }
 
+  // Build the canonical share URL. Always prefer NEXT_PUBLIC_SITE_URL as the
+  // origin so shared links point at the real service domain instead of a
+  // Vercel preview/deployment URL. Falls back to the live origin when unset.
+  function getShareOrigin() {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (siteUrl) return siteUrl.replace(/\/$/, "");
+    if (typeof window !== "undefined") return window.location.origin;
+    return "";
+  }
+
   function getCurrentUrl() {
     if (typeof window === "undefined") return "";
-    return window.location.href;
+    return `${getShareOrigin()}${window.location.pathname}`;
   }
 
   async function copyShareText() {
@@ -167,7 +177,7 @@ export function PostEngagement({ post }: PostEngagementProps) {
           description: `벽보 한 장 뜯어왔어요 👀\n${excerpt}`,
           imageUrl:
             post.image_url ||
-            `${window.location.origin}/og-default.png`,
+            `${getShareOrigin()}/og-default.png`,
           link: {
             mobileWebUrl: url,
             webUrl: url,
