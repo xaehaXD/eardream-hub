@@ -62,7 +62,13 @@ export function PosterCard({ post }: PosterCardProps) {
               ? "기한 지남"
               : statusLabels[post.status]}
           </span>
-          <span className="px-2 py-0.5 text-xs font-medium bg-foreground/10 text-foreground">
+          <span
+            className={`px-2 py-0.5 text-xs font-medium ${
+              post.category === "share"
+                ? "bg-yellow-100/80 text-yellow-900 border border-yellow-200"
+                : "bg-foreground/10 text-foreground"
+            }`}
+          >
             {categoryLabels[post.category]}
           </span>
           {isClosed && (

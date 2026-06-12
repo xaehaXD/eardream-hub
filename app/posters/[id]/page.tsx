@@ -22,6 +22,7 @@ import {
   verifyPostPassword,
   closePost as closePostAction,
 } from "@/app/actions/posts";
+import { PostEngagement } from "@/components/post-engagement";
 
 export default function PosterDetailPage({
   params,
@@ -64,10 +65,10 @@ export default function PosterDetailPage({
   }, [id]);
 
   useEffect(() => {
-    if (post?.category === "test") {
+    if (post?.id) {
       fetchFeedbacks();
     }
-  }, [post?.id, post?.category]);
+  }, [post?.id]);
 
   async function fetchPost() {
     try {
@@ -532,6 +533,9 @@ export default function PosterDetailPage({
                 </div>
               </div>
 
+              {/* Upvote + Share (all posts) */}
+              <PostEngagement post={post} />
+
               {/* Action buttons */}
               {hasEditPassword ? (
                 <div className="flex gap-3 flex-wrap">
@@ -553,9 +557,9 @@ export default function PosterDetailPage({
               ) : (
                 <div className="bg-amber-50 border border-amber-200 p-4">
                   <p className="text-sm text-amber-800">
-                    기존 게시물은 직접 수정/마감이 불가합니다.
+                    초기 벽보라 직접 수정은 어려워요.
                     <br />
-                    수정이나 삭제가 필요하면 관리자에게 요청해주세요.
+                    수정이 필요하면 운영자에게 알려주세요.
                   </p>
                 </div>
               )}
@@ -566,8 +570,8 @@ export default function PosterDetailPage({
           <div className="absolute bottom-0 right-0 w-4 h-4 bg-wall rotate-45 translate-x-1 translate-y-1" />
         </article>
 
-        {/* Feedback section for "써봐줘" posts */}
-        {post.category === "test" && !isClosed && (
+        {/* Public feedback section (all posts) */}
+        {!isClosed && (
           <section className="mt-8">
             <div className="bg-paper/90 p-6 shadow-lg">
               <div className="flex items-center justify-between mb-4">
@@ -663,7 +667,7 @@ export default function PosterDetailPage({
               )}
 
               <p className="text-xs text-muted-foreground mt-4">
-                작성자에게 직접 연락하고 싶다면 위의 &quot;연락처 복사&quot; 버튼을 이용해주세요.
+                공개로 남기기 어려운 말은 위의 연락처로 직접 보내주세요.
               </p>
             </div>
           </section>

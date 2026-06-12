@@ -54,7 +54,8 @@ export default function Page() {
   const filteredPosts = posts
     .filter((post) => {
       if (filter === "all") return true;
-      if (filter === "teamup" || filter === "test") return post.category === filter;
+      if (filter === "teamup" || filter === "test" || filter === "share")
+        return post.category === filter;
       if (filter === "open" || filter === "closed") {
         const effectiveStatus = getEffectiveStatus(post);
         if (filter === "open") return effectiveStatus === "open";
@@ -100,7 +101,7 @@ export default function Page() {
                 이어드림 허브
               </h1>
               <p className="text-paper/70 text-sm sm:text-base leading-relaxed">
-                단톡에 흘러가는 팀원 모집, 테스트 요청, 피드백 요청을
+                단톡에 흘러가는 모집글, 테스트 요청, 유용한 정보를
                 <br className="hidden sm:block" />
                 여기다 벽보처럼 붙여두세요.
               </p>
@@ -131,6 +132,9 @@ export default function Page() {
             </FilterButton>
             <FilterButton active={filter === "test"} onClick={() => setFilter("test")}>
               {categoryLabels.test}
+            </FilterButton>
+            <FilterButton active={filter === "share"} onClick={() => setFilter("share")}>
+              {categoryLabels.share}
             </FilterButton>
             <div className="w-px bg-paper/20 mx-1" />
             <FilterButton active={filter === "open"} onClick={() => setFilter("open")}>

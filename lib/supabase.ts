@@ -6,7 +6,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Types for the posts table
-export type PostCategory = "teamup" | "test";
+export type PostCategory = "teamup" | "test" | "share";
 export type PostStatus = "open" | "closed" | "expired";
 
 // Paper types and visual properties
@@ -115,6 +115,7 @@ export interface Feedback {
 export const categoryLabels: Record<PostCategory, string> = {
   teamup: "같이할래",
   test: "써봐줘",
+  share: "공유할래",
 };
 
 export const statusLabels: Record<PostStatus, string> = {
@@ -263,12 +264,56 @@ export function getContactMessage(category: PostCategory): string {
 이어드림 허브에서 보고 연락드립니다.
 
 모집하시는 역할에 관심이 있어 연락드립니다.`;
+  } else if (category === "share") {
+    return `안녕하세요.
+이어드림 허브에서 보고 연락드립니다.
+
+공유해주신 내용에 관심이 있어 연락드립니다.`;
   } else {
     return `안녕하세요.
 이어드림 허브에서 보고 연락드립니다.
 
 서비스를 사용해보고 피드백을 드리고 싶어 연락드립니다.`;
   }
+}
+
+// Reaction type for upvotes (and future reaction types)
+export interface PostReaction {
+  id: string;
+  post_id: string;
+  reaction_type: string;
+  fingerprint: string;
+  created_at: string;
+}
+
+// Anonymous visitor identifier, stored in localStorage (no PII).
+// Used for upvote de-duplication and share logging without requiring login.
+export function getVisitorId(): string {
+  if (typeof window === "undefined") return "";
+  const KEY = "visitor_id";
+  let id = window.localStorage.getItem(KEY);
+  if (!id) {
+    id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `v_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
+// Build the share text used by both "카톡으로" and "링크포함".
+// Format keeps the 벽보 service tone with title, category, body excerpt, URL.
+export function buildShareText(post: Post, url: string): string {
+  const categoryLabel = categoryLabels[post.category] ?? post.category;
+  const excerpt = post.description.slice(0, 100);
+  return `벽보 한 장 뜯어왔어요 👀
+
+${post.title}
+[${categoryLabel}]
+${excerpt}
+
+${url}`;
 }
 
 // Mock data for development/demo (when Supabase is not connected)

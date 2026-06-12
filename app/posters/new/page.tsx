@@ -362,7 +362,7 @@ export default function NewPosterPage() {
                 <label className="block text-sm font-bold text-foreground mb-2">
                   어떤 벽보인가요? *
                 </label>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <CategoryButton
                     active={category === "teamup"}
                     onClick={() => setCategory("teamup")}
@@ -375,9 +375,19 @@ export default function NewPosterPage() {
                   >
                     {categoryLabels.test}
                   </CategoryButton>
+                  <CategoryButton
+                    active={category === "share"}
+                    onClick={() => setCategory("share")}
+                  >
+                    {categoryLabels.share}
+                  </CategoryButton>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  같이할래: 팀원 모집 / 써봐줘: 테스트 요청
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  같이할래: 팀원, 협업자, 도움 줄 사람을 찾을 때
+                  <br />
+                  써봐줘: 만든 서비스나 프로젝트를 테스트받고 싶을 때
+                  <br />
+                  공유할래: 자료, 팁, 노하우, 경험을 나누고 싶을 때
                 </p>
               </div>
 

@@ -11,7 +11,7 @@ function hashPasswordServer(password: string): string {
 }
 
 export interface PostUpdateInput {
-  category: "teamup" | "test";
+  category: "teamup" | "test" | "share";
   title: string;
   description: string;
   tags: string[];
