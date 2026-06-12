@@ -178,8 +178,11 @@ export function PostEngagement({ post }: PostEngagementProps) {
         ? post.image_url
         : `${getShareOrigin()}/og-default.png`;
 
-      console.log("[Kakao Share URL]", shareUrl);
-      console.log("[Kakao Image URL]", imageUrl);
+      console.log("[Kakao Share Payload]", {
+        shareUrl,
+        imageUrl,
+        hasButtonTitle: true,
+      });
 
       kakao.Share.sendDefault({
         objectType: "feed",
@@ -192,6 +195,7 @@ export function PostEngagement({ post }: PostEngagementProps) {
             webUrl: shareUrl,
           },
         },
+        buttonTitle: "벽보 보러가기",
         buttons: [
           {
             title: "벽보 보러가기",
