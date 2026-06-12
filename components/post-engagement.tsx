@@ -8,7 +8,7 @@ import {
   supabase,
   Post,
   getVisitorId,
-  buildShareText,
+  categoryLabels,
 } from "@/lib/supabase";
 
 declare global {
@@ -133,14 +133,27 @@ export function PostEngagement({ post }: PostEngagementProps) {
     return `${getShareOrigin()}${window.location.pathname}`;
   }
 
+  // Build the copy text so the URL sits on its own line. Kakao auto-links a
+  // URL only when it is isolated on a single line.
+  function buildCopyText() {
+    const categoryLabel = categoryLabels[post.category] ?? post.category;
+    const excerpt = post.description.slice(0, 100);
+    return `${post.title}
+[${categoryLabel}]
+${excerpt}
+
+바로 보기
+${getCurrentUrl()}`;
+  }
+
   async function copyShareText() {
-    const text = buildShareText(post, getCurrentUrl());
+    const text = buildCopyText();
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("내용과 링크를 복사했어요.");
+      toast.success("링크를 복사했어요. 카톡에 붙여넣으면 됩니다.");
       logShare("copy");
     } catch {
-      toast.error("복사에 실패했어요. 링크를 직접 복사해주세요.");
+      toast.error("복사에 실패했어요. 주소창의 링크를 직접 복사해주세요.");
     } finally {
       setShareOpen(false);
     }
@@ -268,16 +281,10 @@ export function PostEngagement({ post }: PostEngagementProps) {
               <p className="text-sm font-bold text-foreground mb-2">공유하기</p>
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={handleKakaoShare}
-                  className="inline-flex h-10 items-center justify-center px-3 text-sm font-bold bg-[#FEE500] text-[#3C1E1E] border border-yellow-500/60 hover:brightness-95 active:scale-95 transition-all"
-                >
-                  카톡 공유
-                </button>
-                <button
                   onClick={copyShareText}
                   className="inline-flex h-10 items-center justify-center px-3 text-sm font-bold bg-background text-foreground border border-foreground/40 hover:bg-foreground/5 active:scale-95 transition-all"
                 >
-                  내용포함 복사
+                  링크 복사
                 </button>
               </div>
             </PopoverContent>
